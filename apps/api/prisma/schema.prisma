@@ -1,0 +1,215 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// High-security enum set for explicit state modeling.
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  LOCKED
+  DEACTIVATED
+}
+
+enum WalletType {
+  FIAT
+  CRYPTO
+}
+
+enum WalletCurrency {
+  NGN
+  USD
+  USDT
+  USDC
+  ETH
+  BTC
+}
+
+enum LedgerTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  P2P_TRANSFER
+  INVESTMENT_FUNDING
+  INVESTMENT_PAYOUT
+  INVESTMENT_INTEREST
+  FEE
+  REVERSAL
+  ADJUSTMENT
+}
+
+enum LedgerTransactionStatus {
+  PENDING
+  POSTED
+  REVERSED
+  FAILED
+}
+
+enum LedgerEntryDirection {
+  DEBIT
+  CREDIT
+}
+
+enum LedgerAccountType {
+  ASSET
+  LIABILITY
+  REVENUE
+  EXPENSE
+  EQUITY
+}
+
+enum InvestmentPlanType {
+  FIXED_TERM
+  FLEXIBLE_DAILY
+}
+
+enum InvestmentPlanStatus {
+  DRAFT
+  ACTIVE
+  MATURED
+  CANCELLED
+  DEFAULTED
+}
+
+model User {
+  id                  String           @id @default(uuid())
+  email               String           @unique @db.VarChar(320)
+  phoneNumber         String?          @unique @db.VarChar(32)
+  finxTag             String           @unique @db.VarChar(32)
+  firstName           String           @db.VarChar(100)
+  lastName            String           @db.VarChar(100)
+  passwordHash        String           @db.VarChar(255)
+  status              UserStatus       @default(ACTIVE)
+  isEmailVerified     Boolean          @default(false)
+  isPhoneVerified     Boolean          @default(false)
+  lastLoginAt         DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  deletedAt           DateTime?
+
+  wallets             Wallet[]
+  initiatedTransfers  LedgerTransaction[] @relation("TransactionInitiator")
+  investmentPlans     InvestmentPlan[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  userId     String
+  tokenHash  String   @unique @db.VarChar(128)
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt, usedAt])
+}
+
+model Wallet {
+  id                    String        @id @default(uuid())
+  userId                String
+  type                  WalletType
+  currency              WalletCurrency
+  availableBalance      Decimal       @default(0) @db.Decimal(30, 8)
+  pendingBalance        Decimal       @default(0) @db.Decimal(30, 8)
+  reservedBalance       Decimal       @default(0) @db.Decimal(30, 8)
+  ledgerVersion         Int           @default(0)
+  isActive              Boolean       @default(true)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  debitEntries          LedgerEntry[] @relation("DebitWalletEntries")
+  creditEntries         LedgerEntry[] @relation("CreditWalletEntries")
+  investmentPlans       InvestmentPlan[]
+
+  @@unique([userId, currency, type], map: "wallet_user_currency_type_unique")
+  @@index([userId])
+  @@index([currency, type])
+}
+
+/// Immutable journal header for every economic event.
+/// The sum of its related entries must net to zero to satisfy double-entry accounting.
+model LedgerTransaction {
+  id                   String                  @id @default(uuid())
+  externalReference    String?                 @unique @db.VarChar(128)
+  idempotencyKey       String?                 @unique @db.VarChar(128)
+  type                 LedgerTransactionType
+  status               LedgerTransactionStatus @default(PENDING)
+  description          String                  @db.VarChar(255)
+  currency             WalletCurrency
+  amount               Decimal                 @db.Decimal(30, 8)
+  metadata             Json?
+  initiatedByUserId    String?
+  postedAt             DateTime?
+  reversedAt           DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  initiatedByUser      User?                   @relation("TransactionInitiator", fields: [initiatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  entries              LedgerEntry[]
+
+  @@index([status, createdAt])
+  @@index([type, createdAt])
+  @@index([initiatedByUserId])
+  @@index([currency, createdAt])
+}
+
+/// Individual debit/credit legs that make a ledger transaction balanced and auditable.
+model LedgerEntry {
+  id                    String               @id @default(uuid())
+  transactionId         String
+  direction             LedgerEntryDirection
+  accountType           LedgerAccountType
+  debitWalletId         String?
+  creditWalletId        String?
+  amount                Decimal              @db.Decimal(30, 8)
+  runningBalanceSnapshot Decimal?            @db.Decimal(30, 8)
+  narration             String?              @db.VarChar(255)
+  metadata              Json?
+  createdAt             DateTime             @default(now())
+
+  transaction           LedgerTransaction    @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  debitWallet           Wallet?              @relation("DebitWalletEntries", fields: [debitWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  creditWallet          Wallet?              @relation("CreditWalletEntries", fields: [creditWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([transactionId])
+  @@index([debitWalletId])
+  @@index([creditWalletId])
+  @@index([direction, createdAt])
+}
+
+model InvestmentPlan {
+  id                    String               @id @default(uuid())
+  userId                String
+  walletId              String
+  type                  InvestmentPlanType
+  status                InvestmentPlanStatus @default(DRAFT)
+  principalAmount       Decimal              @db.Decimal(30, 8)
+  expectedReturnAmount  Decimal              @default(0) @db.Decimal(30, 8)
+  interestRate          Decimal              @db.Decimal(10, 6)
+  durationDays          Int?
+  accrualStartAt        DateTime?
+  maturityAt            DateTime?
+  lastAccruedAt         DateTime?
+  cancelledAt           DateTime?
+  metadata              Json?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  wallet                Wallet               @relation(fields: [walletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([userId, status])
+  @@index([walletId])
+  @@index([type, status])
+  @@index([maturityAt])
+}
