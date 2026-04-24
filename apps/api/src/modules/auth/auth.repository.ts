@@ -1,4 +1,11 @@
-import { Prisma, PrismaClient, UserStatus, WalletCurrency, WalletType } from "@prisma/client";
+import {
+  Prisma,
+  PrismaClient,
+  SessionRevocationReason,
+  UserStatus,
+  WalletCurrency,
+  WalletType,
+} from "@prisma/client";
 import type { ForgotInput, RegisterInput } from "./http/auth.schema";
 
 type TransactionClient = Prisma.TransactionClient;
@@ -13,6 +20,16 @@ export class AuthRepository {
     return this.prisma.user.findFirst({
       where: {
         email,
+        deletedAt: null,
+      },
+    });
+  }
+
+  public async findActiveUserById(userId: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        status: UserStatus.ACTIVE,
         deletedAt: null,
       },
     });
@@ -49,6 +66,21 @@ export class AuthRepository {
     const existingUser = await this.prisma.user.findUnique({
       where: {
         finxTag,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return Boolean(existingUser);
+  }
+
+  public async existsByEmail(email: string): Promise<boolean> {
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        email,
+        status: UserStatus.ACTIVE,
+        deletedAt: null,
       },
       select: {
         id: true,
@@ -106,7 +138,11 @@ export class AuthRepository {
     });
   }
 
-  public async createPasswordResetToken(input: ForgotInput, tokenHash: string, expiresAt: Date) {
+  public async createPasswordResetToken(
+    input: ForgotInput,
+    tokenHash: string,
+    expiresAt: Date,
+  ) {
     const user = await this.findUserByEmail(input.email);
 
     if (!user) {
@@ -128,7 +164,11 @@ export class AuthRepository {
     return user;
   }
 
-  public async resetPassword(userId: string, resetTokenId: string, passwordHash: string): Promise<void> {
+  public async resetPassword(
+    userId: string,
+    resetTokenId: string,
+    passwordHash: string,
+  ): Promise<void> {
     await this.prisma.$transaction(async (transaction) => {
       await transaction.user.update({
         where: {
@@ -148,7 +188,156 @@ export class AuthRepository {
         },
       });
 
-      await this.invalidateOutstandingPasswordResetTokens(transaction, userId, resetTokenId);
+      await this.invalidateOutstandingPasswordResetTokens(
+        transaction,
+        userId,
+        resetTokenId,
+      );
+
+      await this.revokeAllSessionsForUser(
+        userId,
+        SessionRevocationReason.PASSWORD_RESET,
+        transaction,
+      );
+    });
+  }
+
+  public async createSession(input: {
+    id: string;
+    userId: string;
+    refreshTokenHash: string;
+    expiresAt: Date;
+    userAgent?: string | undefined;
+    ipAddress?: string | undefined;
+  }) {
+    return this.prisma.session.create({
+      data: {
+        id: input.id,
+        userId: input.userId,
+        refreshTokenHash: input.refreshTokenHash,
+        expiresAt: input.expiresAt,
+        userAgent: input.userAgent ?? null,
+        ipAddress: input.ipAddress ?? null,
+      },
+    });
+  }
+
+  public async findSessionByRefreshTokenHash(refreshTokenHash: string) {
+    return this.prisma.session.findUnique({
+      where: {
+        refreshTokenHash,
+      },
+      include: {
+        user: true,
+      },
+    });
+  }
+
+  public async rotateSessionForUser(input: {
+    currentSessionId: string;
+    newSessionId: string;
+    userId: string;
+    refreshTokenHash: string;
+    expiresAt: Date;
+    userAgent?: string | undefined;
+    ipAddress?: string | undefined;
+  }) {
+    return this.prisma.$transaction(async (transaction) => {
+      const newSession = await transaction.session.create({
+        data: {
+          id: input.newSessionId,
+          userId: input.userId,
+          refreshTokenHash: input.refreshTokenHash,
+          expiresAt: input.expiresAt,
+          userAgent: input.userAgent ?? null,
+          ipAddress: input.ipAddress ?? null,
+          lastUsedAt: new Date(),
+        },
+      });
+
+      await transaction.session.update({
+        where: {
+          id: input.currentSessionId,
+        },
+        data: {
+          revokedAt: new Date(),
+          revocationReason: SessionRevocationReason.ROTATED,
+          replacedBySessionId: newSession.id,
+          lastUsedAt: new Date(),
+        },
+      });
+
+      return newSession;
+    });
+  }
+
+  public async markSessionUsed(sessionId: string): Promise<void> {
+    await this.prisma.session.update({
+      where: {
+        id: sessionId,
+      },
+      data: {
+        lastUsedAt: new Date(),
+      },
+    });
+  }
+
+  public async revokeSession(
+    sessionId: string,
+    reason: SessionRevocationReason,
+  ): Promise<void> {
+    await this.prisma.session.updateMany({
+      where: {
+        id: sessionId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        revocationReason: reason,
+      },
+    });
+  }
+
+  public async revokeAllSessionsForUser(
+    userId: string,
+    reason: SessionRevocationReason,
+    transaction?: TransactionClient,
+  ): Promise<void> {
+    const client = transaction ?? this.prisma;
+
+    await client.session.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+        revocationReason: reason,
+      },
+    });
+  }
+
+  public async flagRefreshTokenReuse(
+    sessionId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      await transaction.session.update({
+        where: {
+          id: sessionId,
+        },
+        data: {
+          reuseDetectedAt: new Date(),
+          revokedAt: new Date(),
+          revocationReason: SessionRevocationReason.TOKEN_REUSE_DETECTED,
+        },
+      });
+
+      await this.revokeAllSessionsForUser(
+        userId,
+        SessionRevocationReason.TOKEN_REUSE_DETECTED,
+        transaction,
+      );
     });
   }
 

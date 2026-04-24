@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { prisma } from "../../../lib/prisma";
 import { validateRequest } from "../../../utils/validateRequest";
 import { WalletRepository } from "../../wallet/wallet.repository";
@@ -10,10 +10,13 @@ import { InvestService } from "../invest.service";
 import { InvestController } from "./invest.controller";
 import {
   plansRouteSchema,
+  PortfolioQueryInput,
   portfolioQuerySchema,
   portfolioRouteSchema,
+  SubscribeInput,
   subscribeRouteSchema,
   subscribeSchema,
+  WithdrawParamsInput,
   withdrawParamsSchema,
   withdrawRouteSchema,
 } from "./invest.schema";
@@ -28,14 +31,10 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
   ]);
   const investController = new InvestController(investService);
 
-  const authenticate = async (request: FastifyRequest): Promise<void> => {
-    await request.jwtVerify();
-  };
-
   fastify.get(
     "/plans",
     {
-      schema: plansRouteSchema,
+      // schema: plansRouteSchema,
       config: {
         rateLimit: {
           max: 30,
@@ -43,10 +42,10 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
         },
       },
     },
-    investController.listPlans,
+    investController.listPlans
   );
 
-  fastify.post(
+  fastify.post<{ Body: SubscribeInput }>(
     "/subscribe",
     {
       schema: subscribeRouteSchema,
@@ -56,12 +55,12 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: "1 minute",
         },
       },
-      preHandler: [authenticate, validateRequest("body", subscribeSchema)],
+      preHandler: [fastify.authenticate, validateRequest("body", subscribeSchema)],
     },
-    investController.subscribe,
+    investController.subscribe
   );
 
-  fastify.get(
+  fastify.get<{ Querystring: PortfolioQueryInput }>(
     "/my-portfolio",
     {
       schema: portfolioRouteSchema,
@@ -71,12 +70,15 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: "1 minute",
         },
       },
-      preHandler: [authenticate, validateRequest("query", portfolioQuerySchema)],
+      preHandler: [
+        fastify.authenticate,
+        validateRequest("query", portfolioQuerySchema),
+      ],
     },
-    investController.getPortfolio,
+    investController.getPortfolio
   );
 
-  fastify.post(
+  fastify.post<{ Params: WithdrawParamsInput }>(
     "/withdraw/:id",
     {
       schema: withdrawRouteSchema,
@@ -86,8 +88,11 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: "1 minute",
         },
       },
-      preHandler: [authenticate, validateRequest("params", withdrawParamsSchema)],
+      preHandler: [
+        fastify.authenticate,
+        validateRequest("params", withdrawParamsSchema),
+      ],
     },
-    investController.withdraw,
+    investController.withdraw
   );
 };

@@ -95,7 +95,11 @@ export class WalletService {
         amount: input.amount,
         currency: input.currency,
         email,
-        callbackUrl: input.callbackUrl,
+        ...(input.callbackUrl
+          ? {
+              callbackUrl: input.callbackUrl,
+            }
+          : {}),
         reference,
       });
 
@@ -132,7 +136,11 @@ export class WalletService {
         bankCode: input.bankCode,
         accountNumber: input.accountNumber,
         accountName: input.accountName,
-        narration: input.narration,
+        ...(input.narration
+          ? {
+              narration: input.narration,
+            }
+          : {}),
         reference,
       });
 

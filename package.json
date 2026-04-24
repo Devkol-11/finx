@@ -1,13 +1,11 @@
 {
-  "name": "finx",
+  "name": "@finx/workspace",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:api": "pnpm --filter @finx/api dev",
+    "build:api": "pnpm --filter @finx/api build",
+    "typecheck:api": "pnpm --filter @finx/api typecheck"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "packageManager": "pnpm@10.30.0"
 }

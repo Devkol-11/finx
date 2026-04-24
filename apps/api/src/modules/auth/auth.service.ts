@@ -1,15 +1,30 @@
 import argon2 from "argon2";
-import { createHash, randomBytes, randomInt } from "node:crypto";
-import { UserStatus } from "@prisma/client";
+import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
+import { SessionRevocationReason, UserStatus } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import type { FastifyInstance } from "fastify";
+import { env } from "../../config/env";
 import { AppError } from "../../utils/ErrorHandler";
+import { EMAIL_TEMPLATES } from "../../utils/emailTemplates";
+import { queuePublishEmail } from "../pub-sub";
+import { mapJwtError } from "../../plugins/auth";
 import { AuthRepository } from "./auth.repository";
 import type { EmailService } from "./external/email.service";
-import type { ForgotInput, LoginInput, RegisterInput, ResetInput } from "./http/auth.schema";
+import type {
+  ForgotInput,
+  LoginInput,
+  RegisterInput,
+  ResetInput,
+} from "./http/auth.schema";
 
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = 15;
 const MAX_FINX_TAG_GENERATION_ATTEMPTS = 10;
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+type SessionMetadata = {
+  ipAddress?: string | undefined;
+  userAgent?: string | undefined;
+};
 
 /**
  * Auth service contains the business rules for account onboarding and access.
@@ -18,32 +33,59 @@ export class AuthService {
   constructor(
     private readonly authRepository: AuthRepository,
     private readonly emailService: EmailService,
-    private readonly fastify: FastifyInstance,
+    private readonly fastify: FastifyInstance
   ) {}
 
-  public async register(input: RegisterInput) {
+  public async register(
+    input: RegisterInput,
+    sessionMetadata?: SessionMetadata
+  ) {
     const existingUser = await this.authRepository.findUserByEmail(input.email);
 
     if (existingUser) {
-      throw AppError.conflict("An account already exists with this email address.");
+      throw AppError.conflict(
+        "An account already exists with this email address."
+      );
     }
 
     const passwordHash = await argon2.hash(input.password, {
       type: argon2.argon2id,
     });
 
-    for (let attempt = 0; attempt < MAX_FINX_TAG_GENERATION_ATTEMPTS; attempt += 1) {
+    for (
+      let attempt = 0;
+      attempt < MAX_FINX_TAG_GENERATION_ATTEMPTS;
+      attempt += 1
+    ) {
       const finxTag = await this.generateUniqueFinxTag(input, attempt);
 
       try {
-        const createdAccount = await this.authRepository.registerUserWithWallet(input, passwordHash, finxTag);
+        const createdAccount = await this.authRepository.registerUserWithWallet(
+          input,
+          passwordHash,
+          finxTag
+        );
 
-        const token = await this.issueAccessToken(createdAccount.user.id, createdAccount.user.email);
+        const authBundle = await this.createSessionBundle(
+          createdAccount.user.id,
+          createdAccount.user.email,
+          sessionMetadata
+        );
+
+        const subject = EMAIL_TEMPLATES.REGISTERED.subject(
+          createdAccount.user.firstName
+        );
+        const body = EMAIL_TEMPLATES.REGISTERED.body(
+          createdAccount.user.firstName
+        );
+
+        queuePublishEmail(createdAccount.user.firstName, subject, body);
 
         return {
           message: "Registration completed successfully.",
           data: {
-            token,
+            accessToken: authBundle.accessToken,
+            accessTokenExpiresIn: env.ACCESS_TOKEN_TTL,
             user: {
               id: createdAccount.user.id,
               email: createdAccount.user.email,
@@ -55,8 +97,16 @@ export class AuthService {
               id: createdAccount.wallet.id,
               currency: createdAccount.wallet.currency,
               type: createdAccount.wallet.type,
-              availableBalance: createdAccount.wallet.availableBalance.toString(),
+              availableBalance:
+                createdAccount.wallet.availableBalance.toString(),
             },
+            session: {
+              id: authBundle.session.id,
+              expiresAt: authBundle.session.expiresAt.toISOString(),
+            },
+          },
+          meta: {
+            refreshToken: authBundle.refreshToken,
           },
         };
       } catch (error) {
@@ -68,13 +118,18 @@ export class AuthService {
       }
     }
 
-    throw AppError.internal("Unable to allocate a unique FinxTag for the new account.", {
-      isOperational: true,
-    });
+    throw AppError.internal(
+      "Unable to allocate a unique FinxTag for the new account.",
+      {
+        isOperational: true,
+      }
+    );
   }
 
-  public async login(input: LoginInput) {
-    const user = await this.authRepository.findUserByEmailWithWallets(input.email);
+  public async login(input: LoginInput, sessionMetadata?: SessionMetadata) {
+    const user = await this.authRepository.findUserByEmailWithWallets(
+      input.email
+    );
 
     if (!user) {
       throw AppError.unauthorized("Invalid email or password.");
@@ -84,7 +139,10 @@ export class AuthService {
       throw AppError.forbidden("This account is not allowed to sign in.");
     }
 
-    const isPasswordValid = await argon2.verify(user.passwordHash, input.password);
+    const isPasswordValid = await argon2.verify(
+      user.passwordHash,
+      input.password
+    );
 
     if (!isPasswordValid) {
       throw AppError.unauthorized("Invalid email or password.");
@@ -92,12 +150,17 @@ export class AuthService {
 
     await this.authRepository.updateLastLoginAt(user.id);
 
-    const token = await this.issueAccessToken(user.id, user.email);
+    const authBundle = await this.createSessionBundle(
+      user.id,
+      user.email,
+      sessionMetadata
+    );
 
     return {
       message: "Login completed successfully.",
       data: {
-        token,
+        accessToken: authBundle.accessToken,
+        accessTokenExpiresIn: env.ACCESS_TOKEN_TTL,
         user: {
           id: user.id,
           email: user.email,
@@ -105,53 +168,224 @@ export class AuthService {
           firstName: user.firstName,
           lastName: user.lastName,
         },
+        session: {
+          id: authBundle.session.id,
+          expiresAt: authBundle.session.expiresAt.toISOString(),
+        },
+      },
+      meta: {
+        refreshToken: authBundle.refreshToken,
       },
     };
   }
 
+  public async refreshSession(
+    refreshToken: string,
+    sessionMetadata?: SessionMetadata
+  ) {
+    const payload = this.verifyRefreshToken(refreshToken);
+    const refreshTokenHash = this.hashRefreshToken(refreshToken);
+    const existingSession =
+      await this.authRepository.findSessionByRefreshTokenHash(refreshTokenHash);
+
+    if (!existingSession) {
+      throw new AppError("Refresh token is invalid.", 401, {
+        code: "INVALID_REFRESH_TOKEN",
+      });
+    }
+
+    if (
+      payload.userId !== existingSession.userId ||
+      payload.sessionId !== existingSession.id ||
+      payload.type !== "refresh"
+    ) {
+      await this.authRepository.flagRefreshTokenReuse(
+        existingSession.id,
+        existingSession.userId
+      );
+
+      throw new AppError("Refresh token is invalid.", 401, {
+        code: "INVALID_REFRESH_TOKEN",
+      });
+    }
+
+    if (
+      existingSession.revokedAt ||
+      existingSession.replacedBySessionId ||
+      existingSession.revocationReason === SessionRevocationReason.ROTATED ||
+      existingSession.revocationReason ===
+        SessionRevocationReason.TOKEN_REUSE_DETECTED
+    ) {
+      await this.authRepository.flagRefreshTokenReuse(
+        existingSession.id,
+        existingSession.userId
+      );
+
+      throw new AppError(
+        "Refresh token reuse detected. All sessions have been revoked.",
+        401,
+        {
+          code: "REFRESH_TOKEN_REUSE_DETECTED",
+        }
+      );
+    }
+
+    if (existingSession.expiresAt <= new Date()) {
+      await this.authRepository.revokeSession(
+        existingSession.id,
+        SessionRevocationReason.SECURITY_REVOKED
+      );
+
+      throw new AppError("Refresh token has expired.", 401, {
+        code: "REFRESH_TOKEN_EXPIRED",
+      });
+    }
+
+    if (
+      existingSession.user.status !== UserStatus.ACTIVE ||
+      existingSession.user.deletedAt
+    ) {
+      await this.authRepository.revokeAllSessionsForUser(
+        existingSession.userId,
+        SessionRevocationReason.SECURITY_REVOKED
+      );
+
+      throw AppError.forbidden("This account is not allowed to sign in.");
+    }
+
+    const nextSessionId = randomUUID();
+    const nextRefreshToken = this.issueRefreshToken({
+      userId: existingSession.userId,
+      sessionId: nextSessionId,
+    });
+    const nextRefreshTokenExpiresAt = this.buildRefreshTokenExpiryDate();
+
+    const rotatedSession = await this.authRepository.rotateSessionForUser({
+      currentSessionId: existingSession.id,
+      newSessionId: nextSessionId,
+      userId: existingSession.userId,
+      refreshTokenHash: this.hashRefreshToken(nextRefreshToken),
+      expiresAt: nextRefreshTokenExpiresAt,
+      userAgent: sessionMetadata?.userAgent,
+      ipAddress: sessionMetadata?.ipAddress,
+    });
+
+    const accessToken = await this.issueAccessToken(
+      existingSession.userId,
+      existingSession.user.email,
+      rotatedSession.id
+    );
+
+    return {
+      message: "Session refreshed successfully.",
+      data: {
+        accessToken,
+        accessTokenExpiresIn: env.ACCESS_TOKEN_TTL,
+        user: {
+          id: existingSession.user.id,
+          email: existingSession.user.email,
+          finxTag: existingSession.user.finxTag,
+          firstName: existingSession.user.firstName,
+          lastName: existingSession.user.lastName,
+        },
+        session: {
+          id: rotatedSession.id,
+          expiresAt: rotatedSession.expiresAt.toISOString(),
+        },
+      },
+      meta: {
+        refreshToken: nextRefreshToken,
+      },
+    };
+  }
+
+  public async logout(sessionId: string): Promise<void> {
+    await this.authRepository.revokeSession(
+      sessionId,
+      SessionRevocationReason.LOGGED_OUT
+    );
+  }
+
   public async forgotPassword(input: ForgotInput) {
+    const existingUser = await this.authRepository.existsByEmail(input.email);
+
+    if (!existingUser) {
+      return {
+        message: "If the account exists, a password reset email has been sent.",
+      };
+    }
+
     const rawToken = randomBytes(32).toString("hex");
     const tokenHash = this.hashResetToken(rawToken);
-    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MINUTES * 60 * 1000);
+    const expiresAt = new Date(
+      Date.now() + PASSWORD_RESET_TOKEN_TTL_MINUTES * 60 * 1000
+    );
 
-    const user = await this.authRepository.createPasswordResetToken(input, tokenHash, expiresAt);
+    const user = await this.authRepository.createPasswordResetToken(
+      input,
+      tokenHash,
+      expiresAt
+    );
 
     if (user) {
+      const subject = EMAIL_TEMPLATES.PASSWORD_RESET.subject(user.firstName);
+      const body = EMAIL_TEMPLATES.PASSWORD_RESET.body(
+        user.firstName,
+        rawToken
+      );
+
       await this.emailService.sendPasswordResetEmail(user.email, rawToken);
+      queuePublishEmail(user.firstName, subject, body);
     }
 
     return {
-      message: "If the account exists, a password reset email has been queued.",
+      message: "If the account exists, a password reset email has been sent.",
     };
   }
 
   public async resetPassword(input: ResetInput) {
     const tokenHash = this.hashResetToken(input.token);
-    const passwordResetRecord = await this.authRepository.findActiveUserByResetToken(tokenHash);
+    const passwordResetRecord =
+      await this.authRepository.findActiveUserByResetToken(tokenHash);
 
     if (!passwordResetRecord) {
-      throw AppError.badRequest("The password reset token is invalid or has expired.");
+      throw AppError.badRequest(
+        "The password reset token is invalid or has expired."
+      );
     }
 
     const passwordHash = await argon2.hash(input.newPassword, {
       type: argon2.argon2id,
     });
 
-    await this.authRepository.resetPassword(passwordResetRecord.user.id, passwordResetRecord.id, passwordHash);
+    await this.authRepository.resetPassword(
+      passwordResetRecord.user.id,
+      passwordResetRecord.id,
+      passwordHash
+    );
 
     return {
       message: "Password reset completed successfully.",
     };
   }
 
-  private async generateUniqueFinxTag(input: RegisterInput, attempt: number): Promise<string> {
+  private async generateUniqueFinxTag(
+    input: RegisterInput,
+    attempt: number
+  ): Promise<string> {
     const normalizedBase = `${input.firstName}${input.lastName}`
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "")
       .slice(0, 20);
 
-    const fallbackBase = normalizedBase.length > 0 ? normalizedBase : "finxuser";
-    for (let candidateAttempt = attempt; candidateAttempt < MAX_FINX_TAG_GENERATION_ATTEMPTS; candidateAttempt += 1) {
+    const fallbackBase =
+      normalizedBase.length > 0 ? normalizedBase : "finxuser";
+
+    for (
+      let candidateAttempt = attempt;
+      candidateAttempt < MAX_FINX_TAG_GENERATION_ATTEMPTS;
+      candidateAttempt += 1
+    ) {
       const suffix = candidateAttempt === 0 ? "" : `${randomInt(1000, 10000)}`;
       const candidate = `${fallbackBase}${suffix}`.slice(0, 32);
       const exists = await this.authRepository.existsByFinxTag(candidate);
@@ -161,32 +395,115 @@ export class AuthService {
       }
     }
 
-    throw AppError.internal("Unable to allocate a unique FinxTag for the new account.", {
-      isOperational: true,
-    });
+    throw AppError.internal(
+      "Unable to allocate a unique FinxTag for the new account.",
+      {
+        isOperational: true,
+      }
+    );
   }
 
-  private async issueAccessToken(userId: string, email: string): Promise<string> {
+  private async createSessionBundle(
+    userId: string,
+    email: string,
+    sessionMetadata?: SessionMetadata
+  ) {
+    const sessionId = randomUUID();
+    const refreshToken = this.issueRefreshToken({
+      userId,
+      sessionId,
+    });
+    const session = await this.authRepository.createSession({
+      id: sessionId,
+      userId,
+      refreshTokenHash: this.hashRefreshToken(refreshToken),
+      expiresAt: this.buildRefreshTokenExpiryDate(),
+      userAgent: sessionMetadata?.userAgent,
+      ipAddress: sessionMetadata?.ipAddress,
+    });
+    const accessToken = await this.issueAccessToken(userId, email, session.id);
+
+    return {
+      accessToken,
+      refreshToken,
+      session,
+    };
+  }
+
+  private async issueAccessToken(
+    userId: string,
+    email: string,
+    sessionId: string
+  ): Promise<string> {
     return this.fastify.jwt.sign(
       {
         userId,
         email,
+        sessionId,
       },
       {
-        expiresIn: "1d",
-      },
+        expiresIn: env.ACCESS_TOKEN_TTL,
+      }
     );
+  }
+
+  private issueRefreshToken(input: {
+    userId: string;
+    sessionId: string;
+  }): string {
+    return this.fastify.jwt.sign(
+      {
+        userId: input.userId,
+        sessionId: input.sessionId,
+        type: "refresh",
+      },
+      {
+        key: env.JWT_REFRESH_SECRET,
+        expiresIn: env.REFRESH_TOKEN_TTL,
+      }
+    );
+  }
+
+  private verifyRefreshToken(refreshToken: string): {
+    userId: string;
+    sessionId: string;
+    type?: string;
+  } {
+    try {
+      return this.fastify.jwt.verify(refreshToken, {
+        key: env.JWT_REFRESH_SECRET,
+      }) as {
+        userId: string;
+        sessionId: string;
+        type?: string;
+      };
+    } catch (error) {
+      throw mapJwtError(error, {
+        expiredCode: "REFRESH_TOKEN_EXPIRED",
+        invalidCode: "INVALID_REFRESH_TOKEN",
+      });
+    }
+  }
+
+  private hashRefreshToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
+  private buildRefreshTokenExpiryDate(): Date {
+    return new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
   }
 
   private hashResetToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
   }
 
-  private isFinxTagConflict(error: unknown): boolean {
+  private isFinxTagConflict(error: any): boolean {
     return (
       error instanceof PrismaClientKnownRequestError &&
       error.code === "P2002" &&
-      Array.isArray((error.meta as { target?: string[] } | undefined)?.target) &&
+      Array.isArray(
+        (error.meta as { target?: string[] } | undefined)?.target
+      ) &&
       ((error.meta as { target?: string[] }).target ?? []).includes("finxTag")
     );
   }

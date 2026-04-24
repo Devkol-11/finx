@@ -1,12 +1,12 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
-import jwt from "@fastify/jwt";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import { env } from "./config/env";
 import { authRoutes } from "./modules/auth/http/auth.routes";
 import { investRoutes } from "./modules/invest/http/invest.routes";
 import { walletRoutes } from "./modules/wallet/http/wallet.routes";
+import { authPlugin } from "./plugins/auth";
 import { errorPlugin } from "./plugins/errorPlugin";
 
 /**
@@ -37,10 +37,7 @@ export const buildApp = async () => {
   });
 
   await app.register(errorPlugin);
-
-  await app.register(jwt, {
-    secret: env.JWT_SECRET,
-  });
+  await app.register(authPlugin);
 
   await app.register(helmet, {
     global: true,

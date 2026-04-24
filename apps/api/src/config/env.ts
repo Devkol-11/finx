@@ -13,10 +13,35 @@ const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]),
   DATABASE_URL: z.url().min(1, "DATABASE_URL is required."),
   PORT: z.coerce.number().int().min(1).max(65535),
-  JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters long."),
-  PAYSTACK_SECRET_KEY: z.string().min(1, "PAYSTACK_SECRET_KEY is required."),
+  JWT_SECRET_DEV: z
+    .string()
+    .min(32, "JWT_SECRET must be at least 32 characters long."),
+  JWT_SECRET_PROD: z
+    .string()
+    .min(32, "JWT_SECRET must be at least 32 characters long."),
+  JWT_REFRESH_SECRET_DEV: z
+    .string()
+    .min(32, "JWT_REFRESH_SECRET_DEV must be at least 32 characters long.")
+    .optional(),
+  JWT_REFRESH_SECRET_PROD: z
+    .string()
+    .min(32, "JWT_REFRESH_SECRET_PROD must be at least 32 characters long.")
+    .optional(),
+  PAYSTACK_SECRET_KEY_DEV: z
+    .string()
+    .min(1, "PAYSTACK_SECRET_KEY is required."),
+  PAYSTACK_SECRET_KEY_PROD: z
+    .string()
+    .min(1, "PAYSTACK_SECRET_KEY is required."),
+  RESEND_SANDBOX_API_KEY: z
+    .string()
+    .min(1, "RESEND_SANDBOX_API_KEY is required."),
+  RESEND_PRODUCTION_API_KEY: z
+    .string()
+    .min(1, "RESEND_PRODUCTION_API_KEY is required."),
   REDIS_URL: z.url().min(1, "REDIS_URL is required."),
   CORS_ORIGIN: z.string().trim().optional(),
+  COOKIE_DOMAIN: z.string().trim().optional(),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .optional(),
@@ -26,11 +51,13 @@ const parsedEnvironment = environmentSchema.safeParse(process.env);
 
 if (!parsedEnvironment.success) {
   const formattedErrors = parsedEnvironment.error.issues
-    .map((issue) => `${issue.path.join(".") || "process.env"}: ${issue.message}`)
+    .map(
+      (issue) => `${issue.path.join(".") || "process.env"}: ${issue.message}`
+    )
     .join("\n");
 
   throw new Error(
-    `Environment validation failed. The API cannot start with an invalid configuration.\n${formattedErrors}`,
+    `Environment validation failed. The API cannot start with an invalid configuration.\n${formattedErrors}`
   );
 }
 
@@ -42,9 +69,26 @@ const allowedOrigins =
     ? []
     : ["http://localhost:3000", "http://localhost:5173"]);
 
+const isProduction = parsedEnvironment.data.NODE_ENV === "production";
+
 export const env = {
   ...parsedEnvironment.data,
   CORS_ORIGIN_LIST: allowedOrigins,
+  IS_PRODUCTION: isProduction,
+  JWT_ACCESS_SECRET: isProduction
+    ? parsedEnvironment.data.JWT_SECRET_PROD
+    : parsedEnvironment.data.JWT_SECRET_DEV,
+  JWT_REFRESH_SECRET: isProduction
+    ? parsedEnvironment.data.JWT_REFRESH_SECRET_PROD ??
+      parsedEnvironment.data.JWT_SECRET_PROD
+    : parsedEnvironment.data.JWT_REFRESH_SECRET_DEV ??
+      parsedEnvironment.data.JWT_SECRET_DEV,
+  PAYSTACK_SECRET_KEY: isProduction
+    ? parsedEnvironment.data.PAYSTACK_SECRET_KEY_PROD
+    : parsedEnvironment.data.PAYSTACK_SECRET_KEY_DEV,
+  ACCESS_TOKEN_TTL: "15m",
+  REFRESH_TOKEN_TTL: "7d",
+  REFRESH_TOKEN_COOKIE_NAME: "finx_refresh_token",
 } as const;
 
 export type Environment = typeof env;

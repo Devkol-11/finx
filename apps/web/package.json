@@ -1,5 +1,5 @@
 {
-  "name": "@finx/shared",
+  "name": "@finx/web",
   "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@10.30.0"

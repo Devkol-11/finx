@@ -67,8 +67,27 @@ export const registerRouteSchema = {
 
 export const loginRouteSchema = {
   tags: ["Auth"],
-  summary: "Authenticate a FINX user and issue a JWT.",
+  summary: "Authenticate a FINX user and issue access and refresh tokens.",
   body: z.toJSONSchema(loginSchema),
+};
+
+export const refreshRouteSchema = {
+  tags: ["Auth"],
+  summary: "Rotate the refresh token cookie and issue a fresh access token.",
+  response: {
+    200: {
+      type: "object",
+      properties: {
+        message: {
+          type: "string",
+        },
+        data: {
+          type: "object",
+        },
+      },
+      required: ["message", "data"],
+    },
+  },
 };
 
 export const forgotRouteSchema = {
