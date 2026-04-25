@@ -45,7 +45,10 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: "1 minute",
         },
       },
-      preHandler: [fastify.authenticate, validateRequest("query", balanceQuerySchema)],
+      preHandler: [
+        fastify.authenticate,
+        validateRequest("query", balanceQuerySchema),
+      ],
     },
     walletController.getBalance
   );
@@ -60,7 +63,10 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: "1 minute",
         },
       },
-      preHandler: [fastify.authenticate, validateRequest("body", transferSchema)],
+      preHandler: [
+        fastify.authenticate,
+        validateRequest("body", transferSchema),
+      ],
     },
     walletController.transferP2P
   );
@@ -75,7 +81,10 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: "1 minute",
         },
       },
-      preHandler: [fastify.authenticate, validateRequest("body", depositSchema)],
+      preHandler: [
+        fastify.authenticate,
+        validateRequest("body", depositSchema),
+      ],
     },
     walletController.depositFiat
   );
@@ -90,7 +99,10 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: "1 minute",
         },
       },
-      preHandler: [fastify.authenticate, validateRequest("body", withdrawSchema)],
+      preHandler: [
+        fastify.authenticate,
+        validateRequest("body", withdrawSchema),
+      ],
     },
     walletController.withdrawFiat
   );
@@ -98,7 +110,7 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Querystring: TransactionsQueryInput }>(
     "/transactions",
     {
-      schema: transactionsRouteSchema,
+      // schema: transactionsRouteSchema,
       config: {
         rateLimit: {
           max: 20,

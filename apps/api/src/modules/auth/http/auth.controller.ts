@@ -8,18 +8,12 @@ import type {
   ResetInput,
 } from "./auth.schema";
 
-/**
- * Controller keeps HTTP concerns thin and delegates business logic to the service.
- *
- * Validation is intentionally handled in route pre-handlers so controllers only
- * coordinate transport concerns and typed service calls.
- */
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   public register = async (
     request: FastifyRequest<{ Body: RegisterInput }>,
-    reply: FastifyReply,
+    reply: FastifyReply
   ): Promise<void> => {
     const result = await this.authService.register(request.body, {
       ipAddress: request.ip,
@@ -32,7 +26,7 @@ export class AuthController {
 
   public login = async (
     request: FastifyRequest<{ Body: LoginInput }>,
-    reply: FastifyReply,
+    reply: FastifyReply
   ): Promise<void> => {
     const result = await this.authService.login(request.body, {
       ipAddress: request.ip,
@@ -45,7 +39,7 @@ export class AuthController {
 
   public refresh = async (
     request: FastifyRequest,
-    reply: FastifyReply,
+    reply: FastifyReply
   ): Promise<void> => {
     const refreshToken = request.cookies[env.REFRESH_TOKEN_COOKIE_NAME];
 
@@ -76,7 +70,7 @@ export class AuthController {
 
   public logout = async (
     request: FastifyRequest,
-    reply: FastifyReply,
+    reply: FastifyReply
   ): Promise<void> => {
     await this.authService.logout(request.user.sessionId);
     this.clearRefreshCookie(reply);
@@ -88,7 +82,7 @@ export class AuthController {
 
   public forgotPassword = async (
     request: FastifyRequest<{ Body: ForgotInput }>,
-    reply: FastifyReply,
+    reply: FastifyReply
   ): Promise<void> => {
     const result = await this.authService.forgotPassword(request.body);
 
@@ -97,7 +91,7 @@ export class AuthController {
 
   public resetPassword = async (
     request: FastifyRequest<{ Body: ResetInput }>,
-    reply: FastifyReply,
+    reply: FastifyReply
   ): Promise<void> => {
     const result = await this.authService.resetPassword(request.body);
 
@@ -106,7 +100,7 @@ export class AuthController {
 
   private attachRefreshCookie<T extends { meta: { refreshToken: string } }>(
     reply: FastifyReply,
-    result: T,
+    result: T
   ): Omit<T, "meta"> {
     reply.setCookie(env.REFRESH_TOKEN_COOKIE_NAME, result.meta.refreshToken, {
       httpOnly: true,

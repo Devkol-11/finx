@@ -1,12 +1,24 @@
 import { env } from "../../config/env";
 import { appConfig } from "../../config/app.config";
-import { Resend } from "resend";
 
-const apiKey = appConfig.isDev
-  ? env.RESEND_SANDBOX_API_KEY
-  : env.RESEND_PRODUCTION_API_KEY;
+// Lazy load resend to avoid import errors during startup
+let resend: any = null;
 
-const resend = new Resend(apiKey);
+const getResendClient = async () => {
+  if (!resend) {
+    try {
+      const { Resend } = await import("resend");
+      const apiKey = appConfig.isDev
+        ? env.RESEND_SANDBOX_API_KEY
+        : env.RESEND_PRODUCTION_API_KEY;
+      resend = new Resend(apiKey);
+    } catch (error) {
+      console.error("[EMAIL ERROR] Failed to initialize Resend client:", error);
+      throw new Error("Email service unavailable");
+    }
+  }
+  return resend;
+};
 
 export type EmailJobPayload = {
   to: string;
@@ -36,7 +48,8 @@ export const handleEmailJob = async (input: unknown) => {
 
   const receiver = appConfig.isDev ? "bethelcollins100@gmail.com" : payload.to;
 
-  const { data, error } = await resend.emails.send({
+  const client = await getResendClient();
+  const { data, error } = await client.emails.send({
     from: sender,
     to: [receiver],
     subject: payload.subject,

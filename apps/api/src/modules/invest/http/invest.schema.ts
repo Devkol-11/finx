@@ -35,17 +35,17 @@ export const plansRouteSchema = {
 export const subscribeRouteSchema = {
   tags: ["Invest"],
   summary: "Subscribe to an investment plan.",
-  body: z.toJSONSchema(subscribeSchema),
+  // body: z.toJSONSchema(subscribeSchema), // Commented: Transforms cannot be represented in JSON Schema
 };
 
 export const portfolioRouteSchema = {
   tags: ["Invest"],
   summary: "Get the authenticated user's investment portfolio.",
-  querystring: z.toJSONSchema(portfolioQuerySchema),
+  // querystring: z.toJSONSchema(portfolioQuerySchema), // Commented: Transforms cannot be represented in JSON Schema
 };
 
 export const withdrawRouteSchema = {
   tags: ["Invest"],
   summary: "Withdraw or liquidate an investment if the strategy allows it.",
-  params: z.toJSONSchema(withdrawParamsSchema),
+  // params: z.toJSONSchema(withdrawParamsSchema), // Commented: Transforms cannot be represented in JSON Schema
 };

@@ -62,13 +62,57 @@ export type ResetInput = z.infer<typeof resetSchema>;
 export const registerRouteSchema = {
   tags: ["Auth"],
   summary: "Register a new FINX user.",
-  body: z.toJSONSchema(registerSchema),
+  body: {
+    type: "object",
+    required: ["firstName", "lastName", "email", "password"],
+    properties: {
+      firstName: {
+        type: "string",
+        minLength: 2,
+        maxLength: 100,
+      },
+      lastName: {
+        type: "string",
+        minLength: 2,
+        maxLength: 100,
+      },
+      email: {
+        type: "string",
+        format: "email",
+      },
+      phoneNumber: {
+        type: "string",
+        minLength: 10,
+        maxLength: 32,
+        pattern: "^\\+?[0-9]+$",
+      },
+      password: {
+        type: "string",
+        minLength: 8,
+        maxLength: 128,
+      },
+    },
+  },
 };
 
 export const loginRouteSchema = {
   tags: ["Auth"],
   summary: "Authenticate a FINX user and issue access and refresh tokens.",
-  body: z.toJSONSchema(loginSchema),
+  body: {
+    type: "object",
+    required: ["email", "password"],
+    properties: {
+      email: {
+        type: "string",
+        format: "email",
+      },
+      password: {
+        type: "string",
+        minLength: 1,
+        maxLength: 128,
+      },
+    },
+  },
 };
 
 export const refreshRouteSchema = {
@@ -93,11 +137,40 @@ export const refreshRouteSchema = {
 export const forgotRouteSchema = {
   tags: ["Auth"],
   summary: "Start the password reset flow for a FINX user.",
-  body: z.toJSONSchema(forgotSchema),
+  body: {
+    type: "object",
+    required: ["email"],
+    properties: {
+      email: {
+        type: "string",
+        format: "email",
+      },
+    },
+  },
 };
 
 export const resetRouteSchema = {
   tags: ["Auth"],
   summary: "Reset a FINX user password using a valid reset token.",
-  body: z.toJSONSchema(resetSchema),
+  body: {
+    type: "object",
+    required: ["token", "newPassword", "confirmPassword"],
+    properties: {
+      token: {
+        type: "string",
+        minLength: 32,
+        maxLength: 256,
+      },
+      newPassword: {
+        type: "string",
+        minLength: 8,
+        maxLength: 128,
+      },
+      confirmPassword: {
+        type: "string",
+        minLength: 8,
+        maxLength: 128,
+      },
+    },
+  },
 };

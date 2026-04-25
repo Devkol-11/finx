@@ -16,7 +16,12 @@ export const balanceQuerySchema = z.object({
 });
 
 export const transferSchema = z.object({
-  finxTag: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9]+$/, "finxTag must be alphanumeric."),
+  finxTag: z
+    .string()
+    .trim()
+    .min(3)
+    .max(32)
+    .regex(/^[a-zA-Z0-9]+$/, "finxTag must be alphanumeric."),
   amount: decimalAmountSchema,
   narration: z.string().trim().min(3).max(255).optional(),
   currency: z.enum(["NGN"]).default("NGN"),
@@ -52,29 +57,29 @@ export type TransactionsQueryInput = z.infer<typeof transactionsQuerySchema>;
 export const balanceRouteSchema = {
   tags: ["Wallet"],
   summary: "Get wallet balance and recent activity.",
-  querystring: z.toJSONSchema(balanceQuerySchema),
+  // querystring: z.toJSONSchema(balanceQuerySchema), // Commented: Transforms cannot be represented in JSON Schema
 };
 
 export const transferRouteSchema = {
   tags: ["Wallet"],
   summary: "Transfer funds to another FINX user by FinxTag.",
-  body: z.toJSONSchema(transferSchema),
+  // body: z.toJSONSchema(transferSchema), // Commented: Transforms cannot be represented in JSON Schema
 };
 
 export const depositRouteSchema = {
   tags: ["Wallet"],
   summary: "Initialize a fiat deposit with the configured payment provider.",
-  body: z.toJSONSchema(depositSchema),
+  // body: z.toJSONSchema(depositSchema), // Commented: Transforms cannot be represented in JSON Schema
 };
 
 export const withdrawRouteSchema = {
   tags: ["Wallet"],
   summary: "Withdraw fiat funds to a bank account.",
-  body: z.toJSONSchema(withdrawSchema),
+  // body: z.toJSONSchema(withdrawSchema), // Commented: Transforms cannot be represented in JSON Schema
 };
 
 export const transactionsRouteSchema = {
   tags: ["Wallet"],
   summary: "Get paginated wallet ledger activity.",
-  querystring: z.toJSONSchema(transactionsQuerySchema),
+  // querystring: z.toJSONSchema(transactionsQuerySchema), // Commented: Transforms cannot be represented in JSON Schema
 };

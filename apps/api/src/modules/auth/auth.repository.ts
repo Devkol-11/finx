@@ -93,7 +93,7 @@ export class AuthRepository {
   public async registerUserWithWallet(
     input: RegisterInput,
     passwordHash: string,
-    finxTag: string,
+    finxTag: string
   ) {
     return this.prisma.$transaction(async (transaction) => {
       const createdUser = await transaction.user.create({
@@ -141,7 +141,7 @@ export class AuthRepository {
   public async createPasswordResetToken(
     input: ForgotInput,
     tokenHash: string,
-    expiresAt: Date,
+    expiresAt: Date
   ) {
     const user = await this.findUserByEmail(input.email);
 
@@ -167,7 +167,7 @@ export class AuthRepository {
   public async resetPassword(
     userId: string,
     resetTokenId: string,
-    passwordHash: string,
+    passwordHash: string
   ): Promise<void> {
     await this.prisma.$transaction(async (transaction) => {
       await transaction.user.update({
@@ -191,13 +191,13 @@ export class AuthRepository {
       await this.invalidateOutstandingPasswordResetTokens(
         transaction,
         userId,
-        resetTokenId,
+        resetTokenId
       );
 
       await this.revokeAllSessionsForUser(
         userId,
         SessionRevocationReason.PASSWORD_RESET,
-        transaction,
+        transaction
       );
     });
   }
@@ -284,7 +284,7 @@ export class AuthRepository {
 
   public async revokeSession(
     sessionId: string,
-    reason: SessionRevocationReason,
+    reason: SessionRevocationReason
   ): Promise<void> {
     await this.prisma.session.updateMany({
       where: {
@@ -301,7 +301,7 @@ export class AuthRepository {
   public async revokeAllSessionsForUser(
     userId: string,
     reason: SessionRevocationReason,
-    transaction?: TransactionClient,
+    transaction?: TransactionClient
   ): Promise<void> {
     const client = transaction ?? this.prisma;
 
@@ -319,7 +319,7 @@ export class AuthRepository {
 
   public async flagRefreshTokenReuse(
     sessionId: string,
-    userId: string,
+    userId: string
   ): Promise<void> {
     await this.prisma.$transaction(async (transaction) => {
       await transaction.session.update({
@@ -336,7 +336,7 @@ export class AuthRepository {
       await this.revokeAllSessionsForUser(
         userId,
         SessionRevocationReason.TOKEN_REUSE_DETECTED,
-        transaction,
+        transaction
       );
     });
   }
@@ -344,7 +344,7 @@ export class AuthRepository {
   private async invalidateOutstandingPasswordResetTokens(
     transaction: TransactionClient,
     userId: string,
-    excludeTokenId?: string,
+    excludeTokenId?: string
   ): Promise<void> {
     await transaction.passwordResetToken.updateMany({
       where: {

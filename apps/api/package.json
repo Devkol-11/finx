@@ -1,39 +1,40 @@
 {
-    "name":  "@finx/api",
-    "version":  "1.0.0",
-    "private":  true,
-    "description":  "Production-grade backend foundation for the FINX platform.",
-    "main":  "dist/index.js",
-    "scripts":  {
-                    "dev":  "tsx watch src/index.ts",
-                    "build":  "tsc --project tsconfig.json",
-                    "start":  "node dist/src/index.js",
-                    "typecheck":  "tsc --project tsconfig.json --noEmit",
-                    "prisma:generate":  "prisma generate",
-                    "prisma:validate":  "prisma validate"
-                },
-    "packageManager":  "pnpm@10.30.0",
-    "dependencies":  {
-                         "@fastify/cors":  "^11.2.0",
-                         "@fastify/helmet":  "^13.0.2",
-                         "@fastify/jwt":  "^10.0.0",
-                         "@fastify/rate-limit":  "^10.3.0",
-                         "@prisma/adapter-pg":  "^7.8.0",
-                         "@prisma/client":  "^7.8.0",
-                         "argon2":  "^0.44.0",
-                         "bullmq":  "^5.76.0",
-                         "dotenv":  "^17.4.2",
-                         "fastify":  "^5.8.5",
-                         "ioredis":  "^5.10.1",
-                         "pg":  "^8.20.0",
-                         "resend":  "^6.12.2",
-                         "zod":  "^4.3.6",
-                         "@fastify/cookie":  "^11.0.2"
-                     },
-    "devDependencies":  {
-                            "@types/node":  "^25.6.0",
-                            "prisma":  "^7.8.0",
-                            "tsx":  "^4.21.0",
-                            "typescript":  "^6.0.3"
-                        }
+    "name": "@finx/api",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Production-grade backend foundation for the FINX platform.",
+    "main": "dist/index.js",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc --project tsconfig.json",
+        "start": "node dist/src/index.js",
+        "typecheck": "tsc --project tsconfig.json --noEmit",
+        "prisma:generate": "prisma generate",
+        "prisma:validate": "prisma validate"
+    },
+    "packageManager": "pnpm@10.30.0",
+    "dependencies": {
+        "@fastify/cookie": "^11.0.2",
+        "@fastify/cors": "^11.2.0",
+        "@fastify/helmet": "^13.0.2",
+        "@fastify/jwt": "^10.0.0",
+        "@fastify/rate-limit": "^10.3.0",
+        "@prisma/adapter-pg": "^7.8.0",
+        "@prisma/client": "^7.8.0",
+        "@prisma/driver-adapter-utils": "^7.8.0",
+        "argon2": "^0.44.0",
+        "bullmq": "^5.76.0",
+        "dotenv": "^17.4.2",
+        "fastify": "^5.8.5",
+        "ioredis": "^5.10.1",
+        "pg": "^8.20.0",
+        "resend": "^6.12.2",
+        "zod": "^4.3.6"
+    },
+    "devDependencies": {
+        "@types/node": "^25.6.0",
+        "prisma": "^7.8.0",
+        "tsx": "^4.21.0",
+        "typescript": "^6.0.3"
+    }
 }

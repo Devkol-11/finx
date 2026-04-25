@@ -48,7 +48,7 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Body: SubscribeInput }>(
     "/subscribe",
     {
-      schema: subscribeRouteSchema,
+      // schema: subscribeRouteSchema,
       config: {
         rateLimit: {
           max: 10,
@@ -63,7 +63,7 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Querystring: PortfolioQueryInput }>(
     "/my-portfolio",
     {
-      schema: portfolioRouteSchema,
+      // schema: portfolioRouteSchema,
       config: {
         rateLimit: {
           max: 20,
@@ -81,7 +81,7 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Params: WithdrawParamsInput }>(
     "/withdraw/:id",
     {
-      schema: withdrawRouteSchema,
+      // schema: withdrawRouteSchema,
       config: {
         rateLimit: {
           max: 5,

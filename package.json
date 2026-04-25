@@ -5,7 +5,12 @@
   "scripts": {
     "dev:api": "pnpm --filter @finx/api dev",
     "build:api": "pnpm --filter @finx/api build",
-    "typecheck:api": "pnpm --filter @finx/api typecheck"
+    "typecheck:api": "pnpm --filter @finx/api typecheck",
+    "dev:web": "pnpm --filter @finx/web dev",
+    "build:web": "pnpm --filter @finx/web build",
+    "typecheck:web": "pnpm --filter @finx/web type-check",
+    "lint:web": "pnpm --filter @finx/web lint",
+    "format:web": "pnpm --filter @finx/web format"
   },
   "packageManager": "pnpm@10.30.0"
 }
