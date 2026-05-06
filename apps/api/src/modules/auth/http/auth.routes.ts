@@ -3,7 +3,7 @@ import { prisma } from "../../../lib/prisma";
 import { validateRequest } from "../../../utils/validateRequest";
 import { AuthRepository } from "../auth.repository";
 import { AuthService } from "../auth.service";
-import { ConsoleEmailService } from "../external/email.service";
+
 import { AuthController } from "./auth.controller";
 import {
   forgotSchema,
@@ -22,8 +22,7 @@ import {
  */
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   const authRepository = new AuthRepository(prisma);
-  const emailService = new ConsoleEmailService();
-  const authService = new AuthService(authRepository, emailService, fastify);
+  const authService = new AuthService(authRepository, fastify);
   const authController = new AuthController(authService);
 
   fastify.post(

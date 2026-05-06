@@ -42,12 +42,12 @@ const bootstrap = async (): Promise<void> => {
     }
 
     await app.listen({
-      host: "0.0.0.0",
+      host: env.HOST,
       port: env.PORT,
     });
 
     app.log.info(
-      { port: env.PORT, environment: env.NODE_ENV },
+      { host: env.HOST, port: env.PORT, environment: env.NODE_ENV },
       "FINX API started successfully."
     );
 

@@ -2,7 +2,10 @@ import { InvestmentPlanStatus, Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { AppError } from "../../utils/ErrorHandler";
 import { WalletRepository } from "../wallet/wallet.repository";
-import type { IInvestmentStrategy, InvestmentPlanKey } from "./external/interfaces/IInvestmentStrategy";
+import type {
+  IInvestmentStrategy,
+  InvestmentPlanKey,
+} from "./external/IInvestmentStrategy";
 import type {
   PortfolioQueryInput,
   SubscribeInput,
@@ -16,9 +19,11 @@ export class InvestService {
   constructor(
     private readonly investRepository: InvestRepository,
     private readonly walletRepository: WalletRepository,
-    strategies: IInvestmentStrategy[],
+    strategies: IInvestmentStrategy[]
   ) {
-    this.strategies = new Map(strategies.map((strategy) => [strategy.key, strategy]));
+    this.strategies = new Map(
+      strategies.map((strategy) => [strategy.key, strategy])
+    );
   }
 
   public listPlans() {
@@ -47,7 +52,7 @@ export class InvestService {
       userId,
       input,
       strategy,
-      `inv_sub_${randomUUID()}`,
+      `inv_sub_${randomUUID()}`
     );
 
     return {
@@ -66,7 +71,7 @@ export class InvestService {
   public async getPortfolio(userId: string, input: PortfolioQueryInput) {
     const investments = await this.investRepository.getUserPortfolio(
       userId,
-      input.status as InvestmentPlanStatus | undefined,
+      input.status as InvestmentPlanStatus | undefined
     );
 
     const portfolioItems = investments.map((investment) => {
@@ -75,7 +80,7 @@ export class InvestService {
       const accruedInterest = this.calculateAccruedInterestForDisplay(
         investment.principalAmount,
         investment,
-        strategy,
+        strategy
       );
 
       return {
@@ -94,7 +99,7 @@ export class InvestService {
 
     const totalAccruedInterest = portfolioItems.reduce(
       (total, item) => total.plus(item.accruedInterest),
-      new Prisma.Decimal(0),
+      new Prisma.Decimal(0)
     );
 
     return {
@@ -107,7 +112,10 @@ export class InvestService {
   }
 
   public async withdraw(userId: string, params: WithdrawParamsInput) {
-    const investment = await this.investRepository.findInvestmentByIdForUser(userId, params.id);
+    const investment = await this.investRepository.findInvestmentByIdForUser(
+      userId,
+      params.id
+    );
 
     if (!investment) {
       throw AppError.notFound("Investment not found.");
@@ -118,7 +126,7 @@ export class InvestService {
       userId,
       params.id,
       strategy,
-      `inv_wd_${randomUUID()}`,
+      `inv_wd_${randomUUID()}`
     );
 
     return {
@@ -133,8 +141,13 @@ export class InvestService {
   }
 
   public async processDuePayouts(now = new Date()) {
-    const investments = await this.investRepository.getActiveInvestmentsForPayout();
-    const results: Array<{ investmentId: string; payoutAmount: string; reference: string | null }> = [];
+    const investments =
+      await this.investRepository.getActiveInvestmentsForPayout();
+    const results: Array<{
+      investmentId: string;
+      payoutAmount: string;
+      reference: string | null;
+    }> = [];
 
     for (const investment of investments) {
       const planKey = this.extractPlanKey(investment.metadata);
@@ -144,13 +157,17 @@ export class InvestService {
         continue;
       }
 
-      const payoutWindowDays = this.getPayoutWindowDays(strategy, investment.lastAccruedAt, now);
+      const payoutWindowDays = this.getPayoutWindowDays(
+        strategy,
+        investment.lastAccruedAt,
+        now
+      );
 
       if (strategy.payoutFrequency === "MATURITY") {
         if (investment.maturityAt && now >= investment.maturityAt) {
           const payoutAmount = strategy.calculateInterest(
             investment.principalAmount,
-            investment.durationDays ?? 0,
+            investment.durationDays ?? 0
           );
 
           const result = await this.investRepository.creditInvestmentPayout(
@@ -161,7 +178,7 @@ export class InvestService {
             {
               includePrincipal: true,
               markMatured: true,
-            },
+            }
           );
 
           results.push({
@@ -178,13 +195,18 @@ export class InvestService {
         continue;
       }
 
-      const payoutAmount = strategy.calculateInterest(investment.principalAmount, payoutWindowDays);
+      const payoutAmount = strategy.calculateInterest(
+        investment.principalAmount,
+        payoutWindowDays
+      );
 
       if (payoutAmount.lessThanOrEqualTo(0)) {
         continue;
       }
 
-      const shouldAlsoReturnPrincipal = Boolean(investment.maturityAt && now >= investment.maturityAt);
+      const shouldAlsoReturnPrincipal = Boolean(
+        investment.maturityAt && now >= investment.maturityAt
+      );
 
       const result = await this.investRepository.creditInvestmentPayout(
         investment.id,
@@ -194,7 +216,7 @@ export class InvestService {
         {
           includePrincipal: shouldAlsoReturnPrincipal,
           markMatured: shouldAlsoReturnPrincipal,
-        },
+        }
       );
 
       results.push({
@@ -221,7 +243,8 @@ export class InvestService {
   }
 
   private extractPlanKey(metadata: Prisma.JsonValue | null): InvestmentPlanKey {
-    const planKey = (metadata as { planKey?: InvestmentPlanKey } | null)?.planKey;
+    const planKey = (metadata as { planKey?: InvestmentPlanKey } | null)
+      ?.planKey;
 
     if (!planKey) {
       throw AppError.internal("Investment metadata is missing its plan key.", {
@@ -238,25 +261,37 @@ export class InvestService {
       accrualStartAt: Date | null;
       maturityAt: Date | null;
     },
-    strategy: IInvestmentStrategy,
+    strategy: IInvestmentStrategy
   ): Prisma.Decimal {
     if (!investment.accrualStartAt) {
       return new Prisma.Decimal(0);
     }
 
-    const endDate = investment.maturityAt && investment.maturityAt < new Date() ? investment.maturityAt : new Date();
+    const endDate =
+      investment.maturityAt && investment.maturityAt < new Date()
+        ? investment.maturityAt
+        : new Date();
     const elapsedDays = Math.max(
       0,
-      Math.floor((endDate.getTime() - investment.accrualStartAt.getTime()) / (24 * 60 * 60 * 1000)),
+      Math.floor(
+        (endDate.getTime() - investment.accrualStartAt.getTime()) /
+          (24 * 60 * 60 * 1000)
+      )
     );
 
     return strategy.calculateInterest(principalAmount, elapsedDays);
   }
 
-  private getPayoutWindowDays(strategy: IInvestmentStrategy, lastAccruedAt: Date, now: Date): number {
+  private getPayoutWindowDays(
+    strategy: IInvestmentStrategy,
+    lastAccruedAt: Date,
+    now: Date
+  ): number {
     const elapsedDays = Math.max(
       0,
-      Math.floor((now.getTime() - lastAccruedAt.getTime()) / (24 * 60 * 60 * 1000)),
+      Math.floor(
+        (now.getTime() - lastAccruedAt.getTime()) / (24 * 60 * 60 * 1000)
+      )
     );
 
     if (strategy.payoutFrequency === "DAILY") {

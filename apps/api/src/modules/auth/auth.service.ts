@@ -9,7 +9,7 @@ import { EMAIL_TEMPLATES } from "../../utils/emailTemplates";
 import { queuePublishEmail } from "../pub-sub";
 import { mapJwtError } from "../../plugins/auth";
 import { AuthRepository } from "./auth.repository";
-import type { EmailService } from "./external/email.service";
+
 import type {
   ForgotInput,
   LoginInput,
@@ -32,7 +32,6 @@ type SessionMetadata = {
 export class AuthService {
   constructor(
     private readonly authRepository: AuthRepository,
-    private readonly emailService: EmailService,
     private readonly fastify: FastifyInstance
   ) {}
 
@@ -79,7 +78,7 @@ export class AuthService {
           createdAccount.user.firstName
         );
 
-        queuePublishEmail(createdAccount.user.firstName, subject, body);
+        this.dispatchEmail(createdAccount.user.firstName, subject, body);
 
         return {
           message: "Registration completed successfully.",
@@ -327,16 +326,15 @@ export class AuthService {
       expiresAt
     );
 
-    if (user) {
-      const subject = EMAIL_TEMPLATES.PASSWORD_RESET.subject(user.firstName);
-      const body = EMAIL_TEMPLATES.PASSWORD_RESET.body(
-        user.firstName,
-        rawToken
-      );
-
-      await this.emailService.sendPasswordResetEmail(user.email, rawToken);
-      queuePublishEmail(user.firstName, subject, body);
+    if (!user) {
+      throw AppError.internal("Please try again later");
     }
+
+    const subject = EMAIL_TEMPLATES.PASSWORD_RESET.subject(user.firstName);
+    const body = EMAIL_TEMPLATES.PASSWORD_RESET.body(user.firstName, rawToken);
+
+    // await this.emailService.sendPasswordResetEmail(user.email, rawToken);
+    this.dispatchEmail(user.firstName, subject, body);
 
     return {
       message: "If the account exists, a password reset email has been sent.",
@@ -495,6 +493,15 @@ export class AuthService {
 
   private hashResetToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
+  }
+
+  private dispatchEmail(to: string, subject: string, body: string): void {
+    void queuePublishEmail(to, subject, body).catch((error) => {
+      this.fastify.log.warn(
+        { err: error, to },
+        "Failed to enqueue email notification."
+      );
+    });
   }
 
   private isFinxTagConflict(error: any): boolean {

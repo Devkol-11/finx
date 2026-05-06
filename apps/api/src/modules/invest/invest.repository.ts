@@ -10,7 +10,7 @@ import {
   WalletType,
 } from "@prisma/client";
 import { AppError } from "../../utils/ErrorHandler";
-import type { IInvestmentStrategy } from "./external/interfaces/IInvestmentStrategy";
+import type { IInvestmentStrategy } from "./external/IInvestmentStrategy";
 import type { SubscribeInput } from "./http/invest.schema";
 
 type TransactionClient = Prisma.TransactionClient;
@@ -22,7 +22,7 @@ export class InvestRepository {
     userId: string,
     input: SubscribeInput,
     strategy: IInvestmentStrategy,
-    reference: string,
+    reference: string
   ) {
     const amount = new Prisma.Decimal(input.amount);
     const now = new Date();
@@ -32,7 +32,11 @@ export class InvestRepository {
       : new Prisma.Decimal(0);
 
     return this.prisma.$transaction(async (transaction) => {
-      const wallet = await this.getWalletForTransaction(transaction, userId, WalletCurrency.NGN);
+      const wallet = await this.getWalletForTransaction(
+        transaction,
+        userId,
+        WalletCurrency.NGN
+      );
 
       const debitResult = await transaction.wallet.updateMany({
         where: {
@@ -159,7 +163,7 @@ export class InvestRepository {
     userId: string,
     investmentId: string,
     strategy: IInvestmentStrategy,
-    reference: string,
+    reference: string
   ) {
     return this.prisma.$transaction(async (transaction) => {
       const investment = await transaction.investmentPlan.findFirst({
@@ -174,17 +178,24 @@ export class InvestRepository {
         throw AppError.notFound("Investment not found.");
       }
 
-      if (!investment.accrualStartAt || !strategy.canWithdraw(investment.accrualStartAt)) {
+      if (
+        !investment.accrualStartAt ||
+        !strategy.canWithdraw(investment.accrualStartAt)
+      ) {
         throw AppError.forbidden("This investment cannot be withdrawn yet.");
       }
 
-      const wallet = await this.getWalletForTransaction(transaction, userId, WalletCurrency.NGN);
+      const wallet = await this.getWalletForTransaction(
+        transaction,
+        userId,
+        WalletCurrency.NGN
+      );
       const now = new Date();
       const accruedInterest = this.calculateAccruedInterest(
         strategy,
         investment.principalAmount,
         investment.lastAccruedAt,
-        now,
+        now
       );
       const totalPayout = investment.principalAmount.plus(accruedInterest);
 
@@ -280,7 +291,7 @@ export class InvestRepository {
     options?: {
       includePrincipal?: boolean;
       markMatured?: boolean;
-    },
+    }
   ) {
     return this.prisma.$transaction(async (transaction) => {
       const investment = await transaction.investmentPlan.findUnique({
@@ -293,8 +304,14 @@ export class InvestRepository {
         throw AppError.notFound("Investment not found.");
       }
 
-      const wallet = await this.getWalletForTransaction(transaction, investment.userId, WalletCurrency.NGN);
-      const principalComponent = options?.includePrincipal ? investment.principalAmount : new Prisma.Decimal(0);
+      const wallet = await this.getWalletForTransaction(
+        transaction,
+        investment.userId,
+        WalletCurrency.NGN
+      );
+      const principalComponent = options?.includePrincipal
+        ? investment.principalAmount
+        : new Prisma.Decimal(0);
       const totalCredit = payoutAmount.plus(principalComponent);
       const now = new Date();
 
@@ -383,7 +400,11 @@ export class InvestRepository {
     });
   }
 
-  private async getWalletForTransaction(transaction: TransactionClient, userId: string, currency: WalletCurrency) {
+  private async getWalletForTransaction(
+    transaction: TransactionClient,
+    userId: string,
+    currency: WalletCurrency
+  ) {
     const wallet = await transaction.wallet.findFirst({
       where: {
         userId,
@@ -404,7 +425,7 @@ export class InvestRepository {
     strategy: IInvestmentStrategy,
     principalAmount: Prisma.Decimal,
     lastAccruedAt: Date | null,
-    now: Date,
+    now: Date
   ): Prisma.Decimal {
     if (!lastAccruedAt) {
       return new Prisma.Decimal(0);
@@ -412,7 +433,9 @@ export class InvestRepository {
 
     const elapsedDays = Math.max(
       0,
-      Math.floor((now.getTime() - lastAccruedAt.getTime()) / (24 * 60 * 60 * 1000)),
+      Math.floor(
+        (now.getTime() - lastAccruedAt.getTime()) / (24 * 60 * 60 * 1000)
+      )
     );
 
     if (elapsedDays === 0) {

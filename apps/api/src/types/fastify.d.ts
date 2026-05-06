@@ -20,6 +20,7 @@ declare module "@fastify/jwt" {
       userId: string;
       email: string;
       sessionId: string;
+      type?: string;
     };
   }
 }
@@ -34,5 +35,6 @@ declare module "fastify" {
 
   interface FastifyRequest {
     authSession: AuthSession | null;
+    rawBody?: string;
   }
 }

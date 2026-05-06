@@ -3,6 +3,7 @@ import type { WalletService } from "../wallet.service";
 import type {
   BalanceQueryInput,
   DepositInput,
+  PaymentReferenceParams,
   TransactionsQueryInput,
   TransferInput,
   WithdrawInput,
@@ -35,6 +36,7 @@ export class WalletController {
       request.user.userId,
       request.user.email,
       request.body,
+      this.getIdempotencyKey(request),
     );
     void reply.status(200).send(result);
   };
@@ -43,7 +45,22 @@ export class WalletController {
     request: FastifyRequest<{ Body: WithdrawInput }>,
     reply: FastifyReply,
   ): Promise<void> => {
-    const result = await this.walletService.withdrawFiat(request.user.userId, request.body);
+    const result = await this.walletService.withdrawFiat(
+      request.user.userId,
+      request.body,
+      this.getIdempotencyKey(request),
+    );
+    void reply.status(200).send(result);
+  };
+
+  public verifyFiatDeposit = async (
+    request: FastifyRequest<{ Params: PaymentReferenceParams }>,
+    reply: FastifyReply,
+  ): Promise<void> => {
+    const result = await this.walletService.verifyFiatDeposit(
+      request.user.userId,
+      request.params.reference,
+    );
     void reply.status(200).send(result);
   };
 
@@ -54,4 +71,9 @@ export class WalletController {
     const result = await this.walletService.getTransactions(request.user.userId, request.query);
     void reply.status(200).send(result);
   };
+
+  private getIdempotencyKey(request: FastifyRequest): string | undefined {
+    const key = request.headers["x-idempotency-key"] ?? request.headers["idempotency-key"];
+    return Array.isArray(key) ? key[0] : key;
+  }
 }

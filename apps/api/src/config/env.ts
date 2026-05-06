@@ -13,6 +13,8 @@ const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]),
   DATABASE_URL: z.url().min(1, "DATABASE_URL is required."),
   PORT: z.coerce.number().int().min(1).max(65535),
+  HOST: z.string().trim().min(1).optional(),
+  REQUEST_BODY_LIMIT_BYTES: z.coerce.number().int().min(1024).max(10_485_760).optional(),
   JWT_SECRET_DEV: z
     .string()
     .min(32, "JWT_SECRET must be at least 32 characters long."),
@@ -42,9 +44,29 @@ const environmentSchema = z.object({
   REDIS_URL: z.url().min(1, "REDIS_URL is required."),
   CORS_ORIGIN: z.string().trim().optional(),
   COOKIE_DOMAIN: z.string().trim().optional(),
+  METRICS_BEARER_TOKEN: z.string().min(24).optional(),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .optional(),
+}).superRefine((value, context) => {
+  if (
+    value.NODE_ENV === "production" &&
+    (!value.JWT_REFRESH_SECRET_PROD || value.JWT_REFRESH_SECRET_PROD === value.JWT_SECRET_PROD)
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["JWT_REFRESH_SECRET_PROD"],
+      message: "JWT_REFRESH_SECRET_PROD is required in production and must differ from JWT_SECRET_PROD.",
+    });
+  }
+
+  if (value.NODE_ENV === "production" && value.CORS_ORIGIN?.split(",").some((origin) => origin.trim() === "*")) {
+    context.addIssue({
+      code: "custom",
+      path: ["CORS_ORIGIN"],
+      message: "Wildcard CORS origins are not allowed in production.",
+    });
+  }
 });
 
 const parsedEnvironment = environmentSchema.safeParse(process.env);
@@ -86,6 +108,8 @@ export const env = {
   PAYSTACK_SECRET_KEY: isProduction
     ? parsedEnvironment.data.PAYSTACK_SECRET_KEY_PROD
     : parsedEnvironment.data.PAYSTACK_SECRET_KEY_DEV,
+  HOST: parsedEnvironment.data.HOST ?? "0.0.0.0",
+  REQUEST_BODY_LIMIT_BYTES: parsedEnvironment.data.REQUEST_BODY_LIMIT_BYTES ?? 1_048_576,
   ACCESS_TOKEN_TTL: "15m",
   REFRESH_TOKEN_TTL: "7d",
   REFRESH_TOKEN_COOKIE_NAME: "finx_refresh_token",

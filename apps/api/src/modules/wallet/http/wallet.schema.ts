@@ -8,6 +8,12 @@ const decimalAmountSchema = z
   })
   .refine((value) => Number(value) > 0, {
     message: "amount must be greater than zero.",
+  })
+  .refine((value) => {
+    const [, fraction = ""] = value.split(".");
+    return fraction.length <= 2;
+  }, {
+    message: "amount must not have more than two decimal places.",
   });
 
 export const balanceQuerySchema = z.object({
@@ -48,11 +54,21 @@ export const transactionsQuerySchema = z.object({
   currency: z.enum(["NGN", "USD", "USDT", "USDC", "ETH", "BTC"]).optional(),
 });
 
+export const paymentReferenceParamsSchema = z.object({
+  reference: z
+    .string()
+    .trim()
+    .min(6)
+    .max(128)
+    .regex(/^[a-zA-Z0-9._=-]+$/, "reference contains unsupported characters."),
+});
+
 export type BalanceQueryInput = z.infer<typeof balanceQuerySchema>;
 export type TransferInput = z.infer<typeof transferSchema>;
 export type DepositInput = z.infer<typeof depositSchema>;
 export type WithdrawInput = z.infer<typeof withdrawSchema>;
 export type TransactionsQueryInput = z.infer<typeof transactionsQuerySchema>;
+export type PaymentReferenceParams = z.infer<typeof paymentReferenceParamsSchema>;
 
 export const balanceRouteSchema = {
   tags: ["Wallet"],

@@ -61,6 +61,17 @@ export const authPlugin: FastifyPluginAsync = async (fastify) => {
       });
     }
 
+    if (
+      !request.user ||
+      typeof request.user.userId !== "string" ||
+      typeof request.user.sessionId !== "string" ||
+      request.user.type === "refresh"
+    ) {
+      throw new AppError("Authentication token is invalid.", 401, {
+        code: "INVALID_ACCESS_TOKEN",
+      });
+    }
+
     const session = await prisma.session.findFirst({
       where: {
         id: request.user.sessionId,
@@ -90,6 +101,12 @@ export const authPlugin: FastifyPluginAsync = async (fastify) => {
 
       throw new AppError("Your session is no longer valid.", 401, {
         code: "SESSION_REVOKED",
+      });
+    }
+
+    if (session.userId !== request.user.userId) {
+      throw new AppError("Authentication token is invalid.", 401, {
+        code: "INVALID_ACCESS_TOKEN",
       });
     }
 

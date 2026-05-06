@@ -11,6 +11,8 @@ import {
   DepositInput,
   depositRouteSchema,
   depositSchema,
+  PaymentReferenceParams,
+  paymentReferenceParamsSchema,
   TransactionsQueryInput,
   transactionsQuerySchema,
   transactionsRouteSchema,
@@ -87,6 +89,23 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
       ],
     },
     walletController.depositFiat
+  );
+
+  fastify.post<{ Params: PaymentReferenceParams }>(
+    "/deposit/fiat/:reference/verify",
+    {
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: "1 minute",
+        },
+      },
+      preHandler: [
+        fastify.authenticate,
+        validateRequest("params", paymentReferenceParamsSchema),
+      ],
+    },
+    walletController.verifyFiatDeposit
   );
 
   fastify.post<{ Body: WithdrawInput }>(
