@@ -4,13 +4,14 @@ import type { FastifyPluginAsync } from "fastify";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { AppError } from "../utils/ErrorHandler";
+import { getRedisApi } from "../lib/redis";
 
 export const mapJwtError = (
   error: unknown,
   codes: {
     expiredCode: string;
     invalidCode: string;
-  },
+  }
 ): AppError => {
   const code =
     typeof error === "object" &&
@@ -72,22 +73,70 @@ export const authPlugin: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    const session = await prisma.session.findFirst({
-      where: {
-        id: request.user.sessionId,
-        userId: request.user.userId,
-        revokedAt: null,
-        expiresAt: {
-          gt: new Date(),
+    const cache = getRedisApi();
+    const constructSessionCacheKey = (userId: string) => `session:${userId}`;
+
+    const cacheKey = constructSessionCacheKey(request.user.userId);
+
+    // Check Redis cache first - cache-aside pattern
+    let session = null;
+    const cachedSession = await cache.get(cacheKey);
+
+    if (cachedSession) {
+      try {
+        const parsed = JSON.parse(cachedSession);
+        // Validate cached session is still valid
+        if (
+          parsed.id === request.user.sessionId &&
+          parsed.user.status === "ACTIVE" &&
+          new Date(parsed.expiresAt) > new Date()
+        ) {
+          // Cache hit - use cached session
+          session = parsed;
+        } else {
+          // Cache is stale or invalid - clear it
+          if (parsed.user.status !== "ACTIVE") {
+            reply.clearCookie(env.REFRESH_TOKEN_COOKIE_NAME, {
+              path: "/api/v1/auth",
+              ...(env.COOKIE_DOMAIN
+                ? {
+                    domain: env.COOKIE_DOMAIN,
+                  }
+                : {}),
+            });
+          }
+          await cache.del(cacheKey);
+        }
+      } catch (error) {
+        // Cache parse failed - delete and proceed to DB
+        await cache.del(cacheKey);
+      }
+    }
+
+    // Cache miss or invalid - query database
+    if (!session) {
+      session = await prisma.session.findFirst({
+        where: {
+          id: request.user.sessionId,
+          userId: request.user.userId,
+          revokedAt: null,
+          expiresAt: {
+            gt: new Date(),
+          },
+          user: {
+            deletedAt: null,
+          },
         },
-        user: {
-          deletedAt: null,
+        include: {
+          user: true,
         },
-      },
-      include: {
-        user: true,
-      },
-    });
+      });
+
+      // Cache the session for future requests
+      if (session) {
+        await cache.setex(cacheKey, 3600, JSON.stringify(session));
+      }
+    }
 
     if (!session || session.user.status !== "ACTIVE") {
       reply.clearCookie(env.REFRESH_TOKEN_COOKIE_NAME, {

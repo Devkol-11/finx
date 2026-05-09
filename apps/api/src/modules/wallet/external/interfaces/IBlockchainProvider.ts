@@ -7,7 +7,7 @@ export interface SendAssetsPayload {
 
 export interface SendAssetsResult {
   txHash: string;
-  status: "success" | "failed" | "pending";
+  status: 'success' | 'failed' | 'pending';
 }
 
 export interface BlockchainBalanceResult {

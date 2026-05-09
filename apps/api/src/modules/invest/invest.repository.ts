@@ -7,65 +7,54 @@ import {
   Prisma,
   PrismaClient,
   WalletCurrency,
-  WalletType,
-} from "@prisma/client";
-import { AppError } from "../../utils/ErrorHandler";
-import type { IInvestmentStrategy } from "./external/IInvestmentStrategy";
-import type { SubscribeInput } from "./http/invest.schema";
+  WalletType
+} from '@prisma/client';
+import { AppError } from '../../utils/ErrorHandler';
+import type { IInvestmentStrategy } from './external/IInvestmentStrategy';
+import type { SubscribeInput } from './http/invest.schema';
 
 type TransactionClient = Prisma.TransactionClient;
 
 export class InvestRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  public async createSubscription(
-    userId: string,
-    input: SubscribeInput,
-    strategy: IInvestmentStrategy,
-    reference: string
-  ) {
+  public async createSubscription(userId: string, input: SubscribeInput, strategy: IInvestmentStrategy, reference: string) {
     const amount = new Prisma.Decimal(input.amount);
     const now = new Date();
     const maturityAt = strategy.getMaturityDate(now);
-    const expectedReturnAmount = strategy.lockPeriodDays
-      ? strategy.calculateInterest(amount, strategy.lockPeriodDays)
-      : new Prisma.Decimal(0);
+    const expectedReturnAmount = strategy.lockPeriodDays ? strategy.calculateInterest(amount, strategy.lockPeriodDays) : new Prisma.Decimal(0);
 
     return this.prisma.$transaction(async (transaction) => {
-      const wallet = await this.getWalletForTransaction(
-        transaction,
-        userId,
-        WalletCurrency.NGN
-      );
+      const wallet = await this.getWalletForTransaction(transaction, userId, WalletCurrency.NGN);
 
       const debitResult = await transaction.wallet.updateMany({
         where: {
           id: wallet.id,
           availableBalance: {
-            gte: amount,
+            gte: amount
           },
-          isActive: true,
+          isActive: true
         },
         data: {
           availableBalance: {
-            decrement: amount,
+            decrement: amount
           },
           ledgerVersion: {
-            increment: 1,
-          },
-        },
+            increment: 1
+          }
+        }
       });
 
       if (debitResult.count !== 1) {
-        throw new AppError("Insufficient funds.", 409, {
-          code: "INSUFFICIENT_FUNDS",
+        throw new AppError('Insufficient funds.', 409, {
+          code: 'INSUFFICIENT_FUNDS'
         });
       }
 
       const updatedWallet = await transaction.wallet.findUniqueOrThrow({
         where: {
-          id: wallet.id,
-        },
+          id: wallet.id
+        }
       });
 
       const investment = await transaction.investmentPlan.create({
@@ -83,9 +72,9 @@ export class InvestRepository {
           lastAccruedAt: now,
           metadata: {
             planKey: strategy.key,
-            payoutFrequency: strategy.payoutFrequency,
-          },
-        },
+            payoutFrequency: strategy.payoutFrequency
+          }
+        }
       });
 
       const ledgerTransaction = await transaction.ledgerTransaction.create({
@@ -100,7 +89,7 @@ export class InvestRepository {
           postedAt: now,
           metadata: {
             investmentPlanId: investment.id,
-            planKey: strategy.key,
+            planKey: strategy.key
           },
           entries: {
             create: [
@@ -110,7 +99,7 @@ export class InvestRepository {
                 debitWalletId: wallet.id,
                 amount,
                 runningBalanceSnapshot: updatedWallet.availableBalance,
-                narration: `Investment subscription for ${strategy.name}`,
+                narration: `Investment subscription for ${strategy.name}`
               },
               {
                 direction: LedgerEntryDirection.CREDIT,
@@ -119,21 +108,21 @@ export class InvestRepository {
                 narration: `Investment pool credit for ${strategy.name}`,
                 metadata: {
                   investmentPool: true,
-                  planKey: strategy.key,
-                },
-              },
-            ],
-          },
+                  planKey: strategy.key
+                }
+              }
+            ]
+          }
         },
         include: {
-          entries: true,
-        },
+          entries: true
+        }
       });
 
       return {
         investment,
         wallet: updatedWallet,
-        ledgerTransaction,
+        ledgerTransaction
       };
     });
   }
@@ -142,11 +131,11 @@ export class InvestRepository {
     return this.prisma.investmentPlan.findMany({
       where: {
         userId,
-        ...(status ? { status } : {}),
+        ...(status ? { status } : {})
       },
       orderBy: {
-        createdAt: "desc",
-      },
+        createdAt: 'desc'
+      }
     });
   }
 
@@ -154,73 +143,56 @@ export class InvestRepository {
     return this.prisma.investmentPlan.findFirst({
       where: {
         id: investmentId,
-        userId,
-      },
+        userId
+      }
     });
   }
 
-  public async withdrawInvestment(
-    userId: string,
-    investmentId: string,
-    strategy: IInvestmentStrategy,
-    reference: string
-  ) {
+  public async withdrawInvestment(userId: string, investmentId: string, strategy: IInvestmentStrategy, reference: string) {
     return this.prisma.$transaction(async (transaction) => {
       const investment = await transaction.investmentPlan.findFirst({
         where: {
           id: investmentId,
           userId,
-          status: InvestmentPlanStatus.ACTIVE,
-        },
+          status: InvestmentPlanStatus.ACTIVE
+        }
       });
 
       if (!investment) {
-        throw AppError.notFound("Investment not found.");
+        throw AppError.notFound('Investment not found.');
       }
 
-      if (
-        !investment.accrualStartAt ||
-        !strategy.canWithdraw(investment.accrualStartAt)
-      ) {
-        throw AppError.forbidden("This investment cannot be withdrawn yet.");
+      if (!investment.accrualStartAt || !strategy.canWithdraw(investment.accrualStartAt)) {
+        throw AppError.forbidden('This investment cannot be withdrawn yet.');
       }
 
-      const wallet = await this.getWalletForTransaction(
-        transaction,
-        userId,
-        WalletCurrency.NGN
-      );
+      const wallet = await this.getWalletForTransaction(transaction, userId, WalletCurrency.NGN);
       const now = new Date();
-      const accruedInterest = this.calculateAccruedInterest(
-        strategy,
-        investment.principalAmount,
-        investment.lastAccruedAt,
-        now
-      );
+      const accruedInterest = this.calculateAccruedInterest(strategy, investment.principalAmount, investment.lastAccruedAt, now);
       const totalPayout = investment.principalAmount.plus(accruedInterest);
 
       const updatedWallet = await transaction.wallet.update({
         where: {
-          id: wallet.id,
+          id: wallet.id
         },
         data: {
           availableBalance: {
-            increment: totalPayout,
+            increment: totalPayout
           },
           ledgerVersion: {
-            increment: 1,
-          },
-        },
+            increment: 1
+          }
+        }
       });
 
       const updatedInvestment = await transaction.investmentPlan.update({
         where: {
-          id: investment.id,
+          id: investment.id
         },
         data: {
           status: InvestmentPlanStatus.MATURED,
-          lastAccruedAt: now,
-        },
+          lastAccruedAt: now
+        }
       });
 
       const ledgerTransaction = await transaction.ledgerTransaction.create({
@@ -236,7 +208,7 @@ export class InvestRepository {
           metadata: {
             investmentPlanId: investment.id,
             principalAmount: investment.principalAmount.toString(),
-            interestAmount: accruedInterest.toString(),
+            interestAmount: accruedInterest.toString()
           },
           entries: {
             create: [
@@ -246,7 +218,7 @@ export class InvestRepository {
                 creditWalletId: wallet.id,
                 amount: totalPayout,
                 runningBalanceSnapshot: updatedWallet.availableBalance,
-                narration: `Investment withdrawal credit for ${strategy.name}`,
+                narration: `Investment withdrawal credit for ${strategy.name}`
               },
               {
                 direction: LedgerEntryDirection.DEBIT,
@@ -255,19 +227,19 @@ export class InvestRepository {
                 narration: `Investment pool debit for ${strategy.name}`,
                 metadata: {
                   investmentPool: true,
-                  planKey: strategy.key,
-                },
-              },
-            ],
-          },
-        },
+                  planKey: strategy.key
+                }
+              }
+            ]
+          }
+        }
       });
 
       return {
         investment: updatedInvestment,
         wallet: updatedWallet,
         ledgerTransaction,
-        accruedInterest,
+        accruedInterest
       };
     });
   }
@@ -275,11 +247,11 @@ export class InvestRepository {
   public async getActiveInvestmentsForPayout() {
     return this.prisma.investmentPlan.findMany({
       where: {
-        status: InvestmentPlanStatus.ACTIVE,
+        status: InvestmentPlanStatus.ACTIVE
       },
       orderBy: {
-        createdAt: "asc",
-      },
+        createdAt: 'asc'
+      }
     });
   }
 
@@ -296,59 +268,51 @@ export class InvestRepository {
     return this.prisma.$transaction(async (transaction) => {
       const investment = await transaction.investmentPlan.findUnique({
         where: {
-          id: investmentId,
-        },
+          id: investmentId
+        }
       });
 
       if (!investment || investment.status !== InvestmentPlanStatus.ACTIVE) {
-        throw AppError.notFound("Investment not found.");
+        throw AppError.notFound('Investment not found.');
       }
 
-      const wallet = await this.getWalletForTransaction(
-        transaction,
-        investment.userId,
-        WalletCurrency.NGN
-      );
-      const principalComponent = options?.includePrincipal
-        ? investment.principalAmount
-        : new Prisma.Decimal(0);
+      const wallet = await this.getWalletForTransaction(transaction, investment.userId, WalletCurrency.NGN);
+      const principalComponent = options?.includePrincipal ? investment.principalAmount : new Prisma.Decimal(0);
       const totalCredit = payoutAmount.plus(principalComponent);
       const now = new Date();
 
       const updatedWallet = await transaction.wallet.update({
         where: {
-          id: wallet.id,
+          id: wallet.id
         },
         data: {
           availableBalance: {
-            increment: totalCredit,
+            increment: totalCredit
           },
           ledgerVersion: {
-            increment: 1,
-          },
-        },
+            increment: 1
+          }
+        }
       });
 
       const updatedInvestment = await transaction.investmentPlan.update({
         where: {
-          id: investment.id,
+          id: investment.id
         },
         data: {
           lastAccruedAt: now,
           ...(options?.markMatured
             ? {
-                status: InvestmentPlanStatus.MATURED,
+                status: InvestmentPlanStatus.MATURED
               }
-            : {}),
-        },
+            : {})
+        }
       });
 
       const ledgerTransaction = await transaction.ledgerTransaction.create({
         data: {
           externalReference: reference,
-          type: options?.includePrincipal
-            ? LedgerTransactionType.INVESTMENT_PAYOUT
-            : LedgerTransactionType.INVESTMENT_INTEREST,
+          type: options?.includePrincipal ? LedgerTransactionType.INVESTMENT_PAYOUT : LedgerTransactionType.INVESTMENT_INTEREST,
           status: LedgerTransactionStatus.POSTED,
           description: options?.includePrincipal
             ? `Investment maturity payout for ${strategy.name}`
@@ -361,7 +325,7 @@ export class InvestRepository {
             investmentPlanId: investment.id,
             interestAmount: payoutAmount.toString(),
             principalAmount: principalComponent.toString(),
-            planKey: strategy.key,
+            planKey: strategy.key
           },
           entries: {
             create: [
@@ -371,9 +335,7 @@ export class InvestRepository {
                 creditWalletId: wallet.id,
                 amount: totalCredit,
                 runningBalanceSnapshot: updatedWallet.availableBalance,
-                narration: options?.includePrincipal
-                  ? `Maturity payout credit for ${strategy.name}`
-                  : `Interest payout credit for ${strategy.name}`,
+                narration: options?.includePrincipal ? `Maturity payout credit for ${strategy.name}` : `Interest payout credit for ${strategy.name}`
               },
               {
                 direction: LedgerEntryDirection.DEBIT,
@@ -384,38 +346,34 @@ export class InvestRepository {
                   : `Investment pool interest debit for ${strategy.name}`,
                 metadata: {
                   investmentPool: true,
-                  planKey: strategy.key,
-                },
-              },
-            ],
-          },
-        },
+                  planKey: strategy.key
+                }
+              }
+            ]
+          }
+        }
       });
 
       return {
         investment: updatedInvestment,
         wallet: updatedWallet,
-        ledgerTransaction,
+        ledgerTransaction
       };
     });
   }
 
-  private async getWalletForTransaction(
-    transaction: TransactionClient,
-    userId: string,
-    currency: WalletCurrency
-  ) {
+  private async getWalletForTransaction(transaction: TransactionClient, userId: string, currency: WalletCurrency) {
     const wallet = await transaction.wallet.findFirst({
       where: {
         userId,
         currency,
         type: WalletType.FIAT,
-        isActive: true,
-      },
+        isActive: true
+      }
     });
 
     if (!wallet) {
-      throw AppError.notFound("Wallet not found.");
+      throw AppError.notFound('Wallet not found.');
     }
 
     return wallet;
@@ -431,12 +389,7 @@ export class InvestRepository {
       return new Prisma.Decimal(0);
     }
 
-    const elapsedDays = Math.max(
-      0,
-      Math.floor(
-        (now.getTime() - lastAccruedAt.getTime()) / (24 * 60 * 60 * 1000)
-      )
-    );
+    const elapsedDays = Math.max(0, Math.floor((now.getTime() - lastAccruedAt.getTime()) / (24 * 60 * 60 * 1000)));
 
     if (elapsedDays === 0) {
       return new Prisma.Decimal(0);

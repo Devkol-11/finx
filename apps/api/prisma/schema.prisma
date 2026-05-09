@@ -144,7 +144,7 @@ enum PaymentEventType {
 model User {
   id                  String           @id @default(uuid())
   email               String           @unique @db.VarChar(320)
-  phoneNumber         String?          @unique @db.VarChar(32)
+  phoneNumber         String        @unique @db.VarChar(32)
   finxTag             String           @unique @db.VarChar(32)
   firstName           String           @db.VarChar(100)
   lastName            String           @db.VarChar(100)
@@ -157,7 +157,9 @@ model User {
   updatedAt           DateTime         @updatedAt
   deletedAt           DateTime?
 
+
   wallets             Wallet[]
+  virtualAccounts     VirtualAccount[]
   initiatedTransfers  LedgerTransaction[] @relation("TransactionInitiator")
   investmentPlans     InvestmentPlan[]
   passwordResetTokens PasswordResetToken[]
@@ -231,6 +233,27 @@ model Wallet {
   @@unique([userId, currency, type], map: "wallet_user_currency_type_unique")
   @@index([userId])
   @@index([currency, type])
+}
+
+model VirtualAccount {
+  id                    String @id @default(uuid())
+  userId                String
+  provider              PaymentProvider
+  providerCustomerCode  String?
+  accountNumber         String
+  accountName           String
+  bankName              String
+  bankCode              String?
+  providerReference     String?
+  isActive              Boolean @default(true)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user                  User @relation(fields: [userId], references: [id])
+
+  @@unique([provider, accountNumber])
+  @@index([userId])
 }
 
 /// Immutable journal header for every economic event.

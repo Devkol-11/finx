@@ -17,7 +17,7 @@ export interface InitiateDepositResult {
 export interface VerifyTransactionResult {
   reference: string;
   providerTransactionId?: bigint;
-  status: "success" | "failed" | "pending" | "abandoned";
+  status: 'success' | 'failed' | 'pending' | 'abandoned';
   amount: string;
   currency: string;
   gatewayResponse?: string | undefined;
@@ -43,7 +43,7 @@ export interface TransferToBankPayload {
 export interface TransferToBankResult {
   provider: string;
   reference: string;
-  status: "success" | "failed" | "pending";
+  status: 'success' | 'failed' | 'pending';
   recipientCode?: string | undefined;
   transferCode?: string | undefined;
   providerTransferId?: bigint | undefined;

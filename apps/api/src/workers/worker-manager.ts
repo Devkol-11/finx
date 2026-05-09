@@ -1,10 +1,11 @@
-import { Worker, QueueEvents } from "bullmq";
-import type { Job } from "bullmq";
-import { QUEUE_NAMES, QueueName, JOB_NAMES } from "../queues/queue.registry";
-import { handleEmailJob } from "./handlers/email.handler";
-import { handlePaymentJob } from "./handlers/payment.handler";
-import { env } from "../config/env";
-import { appConfig } from "../config/app.config";
+import { Worker, QueueEvents } from 'bullmq';
+import type { Job } from 'bullmq';
+import { QUEUE_NAMES, QueueName, JOB_NAMES } from '../queues/queue.registry';
+import { handleEmailJob } from './handlers/email.handler';
+import { handlePaymentJob } from './handlers/payment.handler';
+import { env } from '../config/env';
+import { appConfig } from '../config/app.config';
+import { handleVirtualAccountJob } from './handlers/virtual.account.handler';
 
 const workers = new Map<QueueName, Worker>();
 const queueEvents = new Map<QueueName, QueueEvents>();
@@ -15,11 +16,14 @@ type QueueHandler<T = QueuePayload> = (payload: T) => Promise<unknown>;
 
 const queueHandlers: Record<QueueName, Record<string, QueueHandler>> = {
   [QUEUE_NAMES.EMAIL]: {
-    [JOB_NAMES.EMAIL.SEND]: handleEmailJob,
+    [JOB_NAMES.EMAIL.SEND]: handleEmailJob
   },
   [QUEUE_NAMES.PAYMENT]: {
-    [JOB_NAMES.PAYMENT.CAPTURE]: handlePaymentJob,
+    [JOB_NAMES.PAYMENT.CAPTURE]: handlePaymentJob
   },
+  [QUEUE_NAMES.VIRTUAL_ACCOUNT_CREATION]: {
+    [JOB_NAMES.VIRTUAL_ACCOUNT_CREATION.CREATE]: handleVirtualAccountJob
+  }
 };
 
 const processJob = async (job: Job<unknown>): Promise<unknown> => {
@@ -41,15 +45,15 @@ const processJob = async (job: Job<unknown>): Promise<unknown> => {
     throw new Error(msg);
   }
 
-  if (!job.data || typeof job.data !== "object") {
-    throw new Error("Invalid job payload: must be a non-null object");
+  if (!job.data || typeof job.data !== 'object') {
+    throw new Error('Invalid job payload: must be a non-null object');
   }
 
   if (appConfig.isDev) {
     console.log(`[WORKER] ${queueName} job started`, {
       jobId: job.id,
       name: jobName,
-      data: job.data,
+      data: job.data
     });
   }
 
@@ -65,39 +69,34 @@ export const startWorkers = async () => {
     const worker = new Worker(queueName, processJob, {
       connection: {
         url: env.REDIS_URL,
-        maxRetriesPerRequest: null,
+        maxRetriesPerRequest: null
       },
       concurrency: 5,
       lockDuration: 300000,
-      autorun: true,
+      autorun: true
     });
 
-    worker.on("error", (error) => {
+    worker.on('error', (error) => {
       console.error(`[WORKER] error on queue ${queueName}`);
       console.error(error);
     });
 
-    worker.on("failed", (job, err) => {
+    worker.on('failed', (job, err) => {
       console.warn(`[WORKER] job failed queue=${queueName} id=${job?.id}`, err);
     });
 
     const events = new QueueEvents(queueName, {
       connection: {
-        url: env.REDIS_URL,
-      },
+        url: env.REDIS_URL
+      }
     });
 
-    events.on("completed", ({ jobId, returnvalue }) => {
-      console.log(
-        `[QUEUE_EVENTS] completed queue=${queueName} jobId=${jobId}`,
-        returnvalue
-      );
+    events.on('completed', ({ jobId, returnvalue }) => {
+      console.log(`[QUEUE_EVENTS] completed queue=${queueName} jobId=${jobId}`, returnvalue);
     });
 
-    events.on("failed", ({ jobId, failedReason }) => {
-      console.error(
-        `[QUEUE_EVENTS] failed queue=${queueName} jobId=${jobId} reason=${failedReason}`
-      );
+    events.on('failed', ({ jobId, failedReason }) => {
+      console.error(`[QUEUE_EVENTS] failed queue=${queueName} jobId=${jobId} reason=${failedReason}`);
     });
 
     workers.set(queueName, worker);
@@ -124,9 +123,7 @@ export const shutdownWorkers = async () => {
       await events.close();
       console.log(`[QUEUE_EVENTS] closed events for queue ${queueName}`);
     } catch (err) {
-      console.error(
-        `[QUEUE_EVENTS] error closing events for queue ${queueName}`
-      );
+      console.error(`[QUEUE_EVENTS] error closing events for queue ${queueName}`);
       console.error(err);
     }
     queueEvents.delete(queueName);
