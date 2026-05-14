@@ -1,5 +1,5 @@
 import { InvestmentPlanType, Prisma } from '@prisma/client';
-import type { IInvestmentStrategy } from '../IInvestmentStrategy';
+import type { IInvestmentStrategy } from '../interface/IInvestmentStrategy';
 
 const WEALTH_MONTHLY_TERM_DAYS = 180;
 

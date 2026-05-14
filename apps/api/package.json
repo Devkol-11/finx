@@ -10,10 +10,11 @@
     "start": "node dist/src/index.js",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "pnpm run build && node dist/src/modules/observability/__tests__/metrics.test.js && node dist/src/modules/payments/__tests__/payment-state.test.js",
-    "prisma:generate": "prisma generate",
-    "prisma:validate": "prisma validate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:push": "prisma db push"
   },
   "packageManager": "pnpm@10.30.0",
   "dependencies": {
@@ -25,6 +26,7 @@
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@prisma/driver-adapter-utils": "^7.8.0",
+    "@types/winston": "^2.4.4",
     "argon2": "^0.44.0",
     "bullmq": "^5.76.0",
     "dotenv": "^17.4.2",
@@ -32,6 +34,7 @@
     "ioredis": "^5.10.1",
     "pg": "^8.20.0",
     "resend": "^6.12.2",
+    "winston": "^3.19.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

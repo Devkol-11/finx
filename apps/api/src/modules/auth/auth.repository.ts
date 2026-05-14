@@ -6,6 +6,7 @@ type TransactionClient = Prisma.TransactionClient;
 /**
  * Repository isolates Prisma persistence details from the Auth service.
  */
+
 export class AuthRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -102,6 +103,12 @@ export class AuthRepository {
           userId: createdUser.id,
           type: WalletType.FIAT,
           currency: WalletCurrency.NGN
+        }
+      });
+
+      await transaction.kycProfile.create({
+        data: {
+          userId: createdUser.id
         }
       });
 

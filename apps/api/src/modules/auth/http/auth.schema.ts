@@ -6,6 +6,7 @@ import { z } from 'zod';
  * These schemas are the single source of truth for request validation and for
  * the controller/service method argument types.
  */
+
 export const registerSchema = z.object({
   firstName: z.string().trim().min(2).max(100),
   lastName: z.string().trim().min(2).max(100),

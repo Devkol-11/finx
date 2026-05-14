@@ -1,6 +1,9 @@
+import { PaymentProvider } from '@prisma/client';
 import { env } from '../../config/env';
+import { prisma } from '../../lib/prisma';
 
 interface jobPayload {
+  userId: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -27,14 +30,19 @@ interface PaystackVirtualAccountResponse {
 }
 
 export async function handleVirtualAccountJob(input: unknown) {
-  if (typeof input !== 'object' || input === null) {
+  if (typeof input !== 'object' && input === null) {
     throw new Error('Invalid virtual account job payload');
+  }
+
+  const payload = input as jobPayload;
+  if (!payload['email'] && payload['firstName'] && payload['lastName'] && payload['phoneNumber'] && payload['userId']) {
+    console.error('INSUFFICIENT VIRTUAL ACCOUNT  PAYLOAD : ', payload);
+    throw new Error('[INSUFFICIENT VIRTUAL ACCOUNT PAYLOAD CREATTION');
   }
   const url = 'https://api.paystack.co/dedicated_account/assign';
   const headers: Record<string, string> = {
     Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`
   };
-  const payload = input as jobPayload;
 
   const request: requestPayload = {
     email: payload.email,
@@ -69,6 +77,15 @@ export async function handleVirtualAccountJob(input: unknown) {
       });
     }
 
+    await prisma.virtualAccount.create({
+      data: {
+        userId: payload.userId,
+        provider: PaymentProvider.PAYSTACK
+      }
+    });
+
     console.log('VIRTUAL ACCOUNT CREATION IN PROGRESS ========= AWAITING WEB_HOOK');
-  } catch (error) {}
+  } catch (error) {
+    console.error('ERROR CREATING VIRTUAL ACCOUNT', error);
+  }
 }

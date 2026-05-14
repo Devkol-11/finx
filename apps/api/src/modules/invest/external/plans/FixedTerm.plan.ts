@@ -1,5 +1,5 @@
 import { InvestmentPlanType, Prisma } from '@prisma/client';
-import type { IInvestmentStrategy } from '../IInvestmentStrategy';
+import type { IInvestmentStrategy } from '../interface/IInvestmentStrategy';
 
 const FIXED_TERM_DAYS = 365;
 

@@ -1,6 +1,17 @@
 import { env } from '../../../../config/env';
+import { AppError } from '../../../../utils/ErrorHandler';
+import { KycProvider, VerificationResult } from '../interface';
 
-export interface KycRequest {
+interface VerifyBvnInput {
+  accountNumber: string;
+  bvn: string;
+  bankCode: string;
+  customerCode: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface KycRequest {
   country: string;
   type: string;
   account_number: string;
@@ -10,7 +21,6 @@ export interface KycRequest {
   last_name: string;
 }
 
-// Identification data structure
 interface IdentificationData {
   country: string;
   type: string;
@@ -19,7 +29,6 @@ interface IdentificationData {
   bank_code: string;
 }
 
-// Paystack response on success
 interface PaystackSuccessResponse {
   event: 'customeridentification.success';
   data: {
@@ -30,7 +39,6 @@ interface PaystackSuccessResponse {
   };
 }
 
-// Paystack response on failure
 interface PaystackFailureResponse {
   event: 'customeridentification.failed';
   data: {
@@ -44,35 +52,24 @@ interface PaystackFailureResponse {
 
 type PaystackResponse = PaystackSuccessResponse | PaystackFailureResponse;
 
-type ResponseType = { success: boolean; message: string } | { success: boolean; message: string; statusCode?: number; code?: string };
-
 enum VerificationEvent {
-  success = 'customeridentification.success',
-  fail = 'customeridentification.failed'
+  SUCCESS = 'customeridentification.success',
+  FAILED = 'customeridentification.failed'
 }
 
-export class PaystackKycVerificator {
-  async verify(input: {
-    accountNumber: string;
-    bvn: string;
-    bankCode: string;
-    customerCode: string;
-    firstName: string;
-    lastName: string;
-  }): Promise<ResponseType> {
-    // Validate environment
+export class PaystackKycVerificator implements KycProvider {
+  private readonly TIMEOUT_MS = 5000;
+
+  async verifyBvn(input: VerifyBvnInput): Promise<VerificationResult> {
     if (!env.PAYSTACK_SECRET_KEY) {
-      return {
-        success: false,
-        message: 'Paystack configuration missing',
-        statusCode: 500,
-        code: 'INTERNAL_SERVER'
-      };
+      console.error('[PAYSTACK_KYC]: PAYSTACK_SECRET_KEY missing');
+
+      throw AppError.internal('Verification service unavailable');
     }
 
     const url = `https://api.paystack.co/customer/${input.customerCode}/identification`;
 
-    const request: KycRequest = {
+    const requestBody: KycRequest = {
       country: 'NG',
       type: 'bank_account',
       account_number: input.accountNumber,
@@ -82,75 +79,101 @@ export class PaystackKycVerificator {
       last_name: input.lastName
     };
 
-    const headers: Record<string, string> = {
+    const headers = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`
     };
+
+    const controller = new AbortController();
+
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, this.TIMEOUT_MS);
 
     try {
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(request)
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
       });
 
-      if (!response.ok) {
-        // Read error response from Paystack
-        const errorData = (await response.json()) as any;
-        const errorMessage = errorData?.message || 'Verification Failed';
+      clearTimeout(timeout);
 
-        console.error('[Paystack KYC Error]', {
-          statusCode: response.status,
+      // HANDLE HTTP FAILURES
+      if (!response.ok) {
+        const errorData: unknown = await response.json();
+
+        console.error('[PAYSTACK_KYC_HTTP_ERROR]', {
+          status: response.status,
           statusText: response.statusText,
           body: errorData
         });
 
-        return {
-          success: false,
-          message: errorMessage,
-          statusCode: response.status,
-          code: response.statusText
-        };
+        // 4xx usually means request/business issue
+        if (response.status >= 400 && response.status < 500) {
+          return {
+            success: false,
+            code: 'VERIFICATION_FAILED',
+            message: 'Verification failed'
+          };
+        }
+        throw AppError.internal('Verification provider unavailable');
       }
 
-      const paystackResponse = (await response.json()) as PaystackResponse;
+      const responseData: unknown = await response.json();
 
-      // Type guard for failure response
-      if (paystackResponse.event === VerificationEvent.fail) {
-        const failResponse = paystackResponse as PaystackFailureResponse;
-        return {
-          success: false,
-          message: failResponse.data.reason || 'Verification failed',
-          statusCode: 400,
-          code: 'BAD_REQUEST'
-        };
+      if (typeof responseData !== 'object' || responseData === null || !('event' in responseData)) {
+        console.error('[PAYSTACK_KYC_INVALID_RESPONSE]', responseData);
+
+        throw AppError.internal('Invalid verification response received');
       }
 
-      // Type guard for success response
-      if (paystackResponse.event === VerificationEvent.success) {
+      const paystackResponse = responseData as PaystackResponse;
+
+      if (paystackResponse.event === VerificationEvent.FAILED) {
+        return {
+          success: false,
+          code: 'VERIFICATION_FAILED',
+          message: paystackResponse.data.reason
+        };
+      }
+      // SUCCESS
+
+      if (paystackResponse.event === VerificationEvent.SUCCESS) {
         return {
           success: true,
-          message: 'Verification Successful'
+          code: 'VERIFIED',
+          message: 'Verification successful'
         };
       }
+      // UNEXPECTED EVENT
 
-      // Fallback for unexpected event
-      return {
-        success: false,
-        message: 'Unexpected verification response',
-        statusCode: 400,
-        code: 'BAD_REQUEST'
-      };
+      throw AppError.internal('Unknown verification event received');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('KYC Verification Error:', errorMessage);
+      clearTimeout(timeout);
 
-      return {
-        success: false,
-        message: 'Something went wrong',
-        statusCode: 500,
-        code: 'INTERNAL_SERVER'
-      };
+      // TIMEOUT ERROR
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('[PAYSTACK_KYC_TIMEOUT]', error.message);
+
+        throw AppError.gatewayTimeout('Verification request timed out');
+      }
+
+      // NETWORK ERRORS
+
+      if (error instanceof TypeError) {
+        console.error('[PAYSTACK_KYC_NETWORK_ERROR]', error.message);
+
+        throw AppError.internal('Unable to reach verification provider');
+      }
+      // APP ERRORS
+      if (error instanceof AppError) {
+        throw error;
+      }
+      // UNKNOWN ERRORS
+      -console.error('[PAYSTACK_KYC_UNKNOWN_ERROR]', error);
+      throw AppError.internal('Unexpected verification error occurred');
     }
   }
 }

@@ -10,7 +10,7 @@ import {
   WalletType
 } from '@prisma/client';
 import { AppError } from '../../utils/ErrorHandler';
-import type { IInvestmentStrategy } from './external/IInvestmentStrategy';
+import type { IInvestmentStrategy } from './external/interface/IInvestmentStrategy';
 import type { SubscribeInput } from './http/invest.schema';
 
 type TransactionClient = Prisma.TransactionClient;

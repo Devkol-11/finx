@@ -6,6 +6,7 @@ import { handlePaymentJob } from './handlers/payment.handler';
 import { env } from '../config/env';
 import { appConfig } from '../config/app.config';
 import { handleVirtualAccountJob } from './handlers/virtual.account.handler';
+import { handleKycJob } from './handlers/kyc.handler';
 
 const workers = new Map<QueueName, Worker>();
 const queueEvents = new Map<QueueName, QueueEvents>();
@@ -23,6 +24,9 @@ const queueHandlers: Record<QueueName, Record<string, QueueHandler>> = {
   },
   [QUEUE_NAMES.VIRTUAL_ACCOUNT_CREATION]: {
     [JOB_NAMES.VIRTUAL_ACCOUNT_CREATION.CREATE]: handleVirtualAccountJob
+  },
+  [QUEUE_NAMES.KYC_PROFILE_VERIFICATION]: {
+    [JOB_NAMES.KYC_PROFILE_VERIFICATION.VERIFY]: handleKycJob
   }
 };
 

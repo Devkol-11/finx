@@ -22,7 +22,7 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [validateRequest('body', paystackWebhookSchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('body', paystackWebhookSchema)]
     },
     paymentController.paystackWebhook
   );

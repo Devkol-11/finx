@@ -1,6 +1,7 @@
-import "@fastify/jwt";
-import type { Prisma } from "@prisma/client";
-import type { FastifyReply, FastifyRequest } from "fastify";
+import 'fastify';
+import '@fastify/jwt';
+import type { Prisma } from '@prisma/client';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 type AuthSession = Prisma.SessionGetPayload<{
   include: {
@@ -8,7 +9,7 @@ type AuthSession = Prisma.SessionGetPayload<{
   };
 }>;
 
-declare module "@fastify/jwt" {
+declare module '@fastify/jwt' {
   interface FastifyJWT {
     payload: {
       userId: string;
@@ -25,16 +26,19 @@ declare module "@fastify/jwt" {
   }
 }
 
-declare module "fastify" {
+declare module 'fastify' {
   interface FastifyInstance {
-    authenticate: (
-      request: FastifyRequest,
-      reply: FastifyReply,
-    ) => Promise<void>;
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 
   interface FastifyRequest {
     authSession: AuthSession | null;
     rawBody?: string;
+  }
+}
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    rawbody?: string;
   }
 }

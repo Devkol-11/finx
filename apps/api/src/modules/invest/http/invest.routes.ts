@@ -36,7 +36,8 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
           max: 30,
           timeWindow: '1 minute'
         }
-      }
+      },
+      preHandler: [(request, reply) => fastify.authenticate(request, reply)]
     },
     investController.listPlans
   );
@@ -51,7 +52,7 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [fastify.authenticate, validateRequest('body', subscribeSchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('body', subscribeSchema)]
     },
     investController.subscribe
   );
@@ -66,7 +67,7 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [fastify.authenticate, validateRequest('query', portfolioQuerySchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('query', portfolioQuerySchema)]
     },
     investController.getPortfolio
   );
@@ -81,7 +82,7 @@ export const investRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [fastify.authenticate, validateRequest('params', withdrawParamsSchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('params', withdrawParamsSchema)]
     },
     investController.withdraw
   );

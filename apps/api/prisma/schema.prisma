@@ -88,6 +88,11 @@ enum KycStatus {
   REJECTED
 }
 
+enum KycProvider {
+  PAYSTACK
+  SMILE
+}
+
 enum KycVerificationType {
   BVN
   NIN
@@ -134,33 +139,37 @@ enum PaymentEventType {
   PROVIDER_TRANSFER_CREATED
   PROVIDER_VERIFIED
   WEBHOOK_RECEIVED
-  STATE_TRANSITION
   LEDGER_POSTED
   PROVIDER_FAILED
+  STATE_TRANSITION
 }
 
-
+enum VirtualAccountStatus {
+  PENDING
+  ACTIVE
+  FAILED
+  DEACTIVATED
+}
 
 model User {
-  id                  String           @id @default(uuid())
-  email               String           @unique @db.VarChar(320)
-  phoneNumber         String        @unique @db.VarChar(32)
-  finxTag             String           @unique @db.VarChar(32)
-  firstName           String           @db.VarChar(100)
-  lastName            String           @db.VarChar(100)
-  passwordHash        String           @db.VarChar(255)
-  status              UserStatus       @default(ACTIVE)
-  isEmailVerified     Boolean          @default(false)
-  isPhoneVerified     Boolean          @default(false)
-  lastLoginAt         DateTime?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  deletedAt           DateTime?
-
+  id              String     @id @default(uuid())
+  email           String     @unique @db.VarChar(320)
+  phoneNumber     String     @unique @db.VarChar(32)
+  finxTag         String     @unique @db.VarChar(32)
+  firstName       String     @db.VarChar(100)
+  lastName        String     @db.VarChar(100)
+  passwordHash    String     @db.VarChar(255)
+  status          UserStatus @default(ACTIVE)
+  isEmailVerified Boolean    @default(false)
+  isPhoneVerified Boolean    @default(false)
+  lastLoginAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
 
   wallets             Wallet[]
   virtualAccounts     VirtualAccount[]
-  initiatedTransfers  LedgerTransaction[] @relation("TransactionInitiator")
+  initiatedTransfers  LedgerTransaction[]  @relation("TransactionInitiator")
   investmentPlans     InvestmentPlan[]
   passwordResetTokens PasswordResetToken[]
   sessions            Session[]
@@ -174,23 +183,23 @@ model User {
 }
 
 model Session {
-  id                  String                  @id @default(uuid())
+  id                  String                   @id @default(uuid())
   userId              String
-  refreshTokenHash    String                  @unique @db.VarChar(128)
+  refreshTokenHash    String                   @unique @db.VarChar(128)
   expiresAt           DateTime
-  userAgent           String?                 @db.VarChar(512)
-  ipAddress           String?                 @db.VarChar(64)
+  userAgent           String?                  @db.VarChar(512)
+  ipAddress           String?                  @db.VarChar(64)
   lastUsedAt          DateTime?
   revokedAt           DateTime?
   revocationReason    SessionRevocationReason?
-  replacedBySessionId String?                 @unique
+  replacedBySessionId String?                  @unique
   reuseDetectedAt     DateTime?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 
-  user                User                    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  replacedBySession   Session?                @relation("SessionRotation", fields: [replacedBySessionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  previousSession     Session?                @relation("SessionRotation")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  replacedBySession Session? @relation("SessionRotation", fields: [replacedBySessionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  previousSession   Session? @relation("SessionRotation")
 
   @@index([userId, revokedAt])
   @@index([userId, expiresAt])
@@ -198,37 +207,37 @@ model Session {
 }
 
 model PasswordResetToken {
-  id         String   @id @default(uuid())
-  userId     String
-  tokenHash  String   @unique @db.VarChar(128)
-  expiresAt  DateTime
-  usedAt     DateTime?
-  createdAt  DateTime @default(now())
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique @db.VarChar(128)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([userId, expiresAt])
   @@index([expiresAt, usedAt])
 }
 
 model Wallet {
-  id                    String        @id @default(uuid())
-  userId                String
-  type                  WalletType
-  currency              WalletCurrency
-  availableBalance      Decimal       @default(0) @db.Decimal(30, 8)
-  pendingBalance        Decimal       @default(0) @db.Decimal(30, 8)
-  reservedBalance       Decimal       @default(0) @db.Decimal(30, 8)
-  ledgerVersion         Int           @default(0)
-  isActive              Boolean       @default(true)
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  id               String         @id @default(uuid())
+  userId           String
+  type             WalletType
+  currency         WalletCurrency
+  availableBalance Decimal        @default(0) @db.Decimal(30, 8)
+  pendingBalance   Decimal        @default(0) @db.Decimal(30, 8)
+  reservedBalance  Decimal        @default(0) @db.Decimal(30, 8)
+  ledgerVersion    Int            @default(0)
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  user                  User          @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  debitEntries          LedgerEntry[] @relation("DebitWalletEntries")
-  creditEntries         LedgerEntry[] @relation("CreditWalletEntries")
-  investmentPlans       InvestmentPlan[]
-  paymentIntents        PaymentIntent[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  debitEntries    LedgerEntry[]    @relation("DebitWalletEntries")
+  creditEntries   LedgerEntry[]    @relation("CreditWalletEntries")
+  investmentPlans InvestmentPlan[]
+  paymentIntents  PaymentIntent[]
 
   @@unique([userId, currency, type], map: "wallet_user_currency_type_unique")
   @@index([userId])
@@ -236,47 +245,59 @@ model Wallet {
 }
 
 model VirtualAccount {
-  id                    String @id @default(uuid())
-  userId                String
-  provider              PaymentProvider
-  providerCustomerCode  String?
-  accountNumber         String
-  accountName           String
-  bankName              String
-  bankCode              String?
-  providerReference     String?
-  isActive              Boolean @default(true)
+  id String @id @default(uuid())
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  userId String
 
-  user                  User @relation(fields: [userId], references: [id])
+  provider PaymentProvider
+
+  providerCustomerCode String?
+
+  providerReference String?
+
+  accountNumber String?
+  accountName   String?
+
+  bankName String?
+  bankCode String?
+
+  status VirtualAccountStatus @default(PENDING)
+
+  failureReason String?
+
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
 
   @@unique([provider, accountNumber])
+  @@unique([userId, provider])
   @@index([userId])
+  @@index([providerCustomerCode])
 }
 
 /// Immutable journal header for every economic event.
 /// The sum of its related entries must net to zero to satisfy double-entry accounting.
 model LedgerTransaction {
-  id                   String                  @id @default(uuid())
-  externalReference    String?                 @unique @db.VarChar(128)
-  idempotencyKey       String?                 @unique @db.VarChar(128)
-  type                 LedgerTransactionType
-  status               LedgerTransactionStatus @default(PENDING)
-  description          String                  @db.VarChar(255)
-  currency             WalletCurrency
-  amount               Decimal                 @db.Decimal(30, 8)
-  metadata             Json?
-  initiatedByUserId    String?
-  postedAt             DateTime?
-  reversedAt           DateTime?
-  createdAt            DateTime                @default(now())
-  updatedAt            DateTime                @updatedAt
+  id                String                  @id @default(uuid())
+  externalReference String?                 @unique @db.VarChar(128)
+  idempotencyKey    String?                 @unique @db.VarChar(128)
+  type              LedgerTransactionType
+  status            LedgerTransactionStatus @default(PENDING)
+  description       String                  @db.VarChar(255)
+  currency          WalletCurrency
+  amount            Decimal                 @db.Decimal(30, 8)
+  metadata          Json?
+  initiatedByUserId String?
+  postedAt          DateTime?
+  reversedAt        DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 
-  initiatedByUser      User?                   @relation("TransactionInitiator", fields: [initiatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  entries              LedgerEntry[]
-  paymentIntent        PaymentIntent?
+  initiatedByUser User?          @relation("TransactionInitiator", fields: [initiatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  entries         LedgerEntry[]
+  paymentIntent   PaymentIntent?
 
   @@index([status, createdAt])
   @@index([type, createdAt])
@@ -285,42 +306,42 @@ model LedgerTransaction {
 }
 
 model PaymentIntent {
-  id                    String          @id @default(uuid())
+  id                    String           @id @default(uuid())
   userId                String
   walletId              String
-  ledgerTransactionId   String?         @unique
+  ledgerTransactionId   String?          @unique
   provider              PaymentProvider
   direction             PaymentDirection
   type                  PaymentType
-  status                PaymentStatus   @default(INITIATED)
-  reference             String          @unique @db.VarChar(128)
-  idempotencyKey        String?         @unique @db.VarChar(128)
-  providerReference     String?         @db.VarChar(128)
+  status                PaymentStatus    @default(INITIATED)
+  reference             String           @unique @db.VarChar(128)
+  idempotencyKey        String?          @unique @db.VarChar(128)
+  providerReference     String?          @db.VarChar(128)
   providerTransactionId BigInt?
-  amount                Decimal         @db.Decimal(30, 8)
+  amount                Decimal          @db.Decimal(30, 8)
   currency              WalletCurrency
-  email                 String?         @db.VarChar(320)
-  callbackUrl           String?         @db.VarChar(2048)
-  authorizationUrl      String?         @db.VarChar(2048)
-  accessCode            String?         @db.VarChar(128)
-  recipientCode         String?         @db.VarChar(128)
-  providerStatus        String?         @db.VarChar(64)
-  gatewayResponse       String?         @db.VarChar(255)
-  fees                  Decimal?        @db.Decimal(30, 8)
+  email                 String?          @db.VarChar(320)
+  callbackUrl           String?          @db.VarChar(2048)
+  authorizationUrl      String?          @db.VarChar(2048)
+  accessCode            String?          @db.VarChar(128)
+  recipientCode         String?          @db.VarChar(128)
+  providerStatus        String?          @db.VarChar(64)
+  gatewayResponse       String?          @db.VarChar(255)
+  fees                  Decimal?         @db.Decimal(30, 8)
   paidAt                DateTime?
   processedAt           DateTime?
   failedAt              DateTime?
-  failureReason         String?         @db.VarChar(255)
+  failureReason         String?          @db.VarChar(255)
   metadata              Json?
   providerPayload       Json?
-  version               Int             @default(0)
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  version               Int              @default(0)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
-  user                  User            @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  wallet                Wallet          @relation(fields: [walletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  ledgerTransaction     LedgerTransaction? @relation(fields: [ledgerTransactionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  events                PaymentEvent[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  wallet            Wallet             @relation(fields: [walletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  ledgerTransaction LedgerTransaction? @relation(fields: [ledgerTransactionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  events            PaymentEvent[]
 
   @@index([userId, status, createdAt])
   @@index([walletId, status, createdAt])
@@ -330,41 +351,63 @@ model PaymentIntent {
 }
 
 model PaymentEvent {
-  id                String            @id @default(uuid())
+  id                String           @id @default(uuid())
   paymentIntentId   String
   eventType         PaymentEventType
   fromStatus        PaymentStatus?
   toStatus          PaymentStatus?
-  idempotencyKey    String?           @db.VarChar(128)
-  requestId         String?           @db.VarChar(128)
-  providerReference String?           @db.VarChar(128)
+  idempotencyKey    String?          @db.VarChar(128)
+  requestId         String?          @db.VarChar(128)
+  providerReference String?          @db.VarChar(128)
   payload           Json?
-  createdAt         DateTime          @default(now())
+  createdAt         DateTime         @default(now())
 
-  paymentIntent     PaymentIntent     @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  paymentIntent PaymentIntent @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([paymentIntentId, createdAt])
   @@index([eventType, createdAt])
   @@index([providerReference])
 }
 
+model WebhookEvent {
+  id String @id @default(uuid())
+
+  provider PaymentProvider
+
+  providerEventId   String? @unique
+  providerReference String?
+
+  eventType String
+
+  payload Json
+
+  processed   Boolean   @default(false)
+  processedAt DateTime?
+
+  receivedAt DateTime @default(now())
+
+  processingError String?
+
+  createdAt DateTime @default(now())
+}
+
 /// Individual debit/credit legs that make a ledger transaction balanced and auditable.
 model LedgerEntry {
-  id                    String               @id @default(uuid())
-  transactionId         String
-  direction             LedgerEntryDirection
-  accountType           LedgerAccountType
-  debitWalletId         String?
-  creditWalletId        String?
-  amount                Decimal              @db.Decimal(30, 8)
-  runningBalanceSnapshot Decimal?            @db.Decimal(30, 8)
-  narration             String?              @db.VarChar(255)
-  metadata              Json?
-  createdAt             DateTime             @default(now())
+  id                     String               @id @default(uuid())
+  transactionId          String
+  direction              LedgerEntryDirection
+  accountType            LedgerAccountType
+  debitWalletId          String?
+  creditWalletId         String?
+  amount                 Decimal              @db.Decimal(30, 8)
+  runningBalanceSnapshot Decimal?             @db.Decimal(30, 8)
+  narration              String?              @db.VarChar(255)
+  metadata               Json?
+  createdAt              DateTime             @default(now())
 
-  transaction           LedgerTransaction    @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  debitWallet           Wallet?              @relation("DebitWalletEntries", fields: [debitWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  creditWallet          Wallet?              @relation("CreditWalletEntries", fields: [creditWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  transaction  LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  debitWallet  Wallet?           @relation("DebitWalletEntries", fields: [debitWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  creditWallet Wallet?           @relation("CreditWalletEntries", fields: [creditWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([transactionId])
   @@index([debitWalletId])
@@ -373,25 +416,25 @@ model LedgerEntry {
 }
 
 model InvestmentPlan {
-  id                    String               @id @default(uuid())
-  userId                String
-  walletId              String
-  type                  InvestmentPlanType
-  status                InvestmentPlanStatus @default(DRAFT)
-  principalAmount       Decimal              @db.Decimal(30, 8)
-  expectedReturnAmount  Decimal              @default(0) @db.Decimal(30, 8)
-  interestRate          Decimal              @db.Decimal(10, 6)
-  durationDays          Int?
-  accrualStartAt        DateTime?
-  maturityAt            DateTime?
-  lastAccruedAt         DateTime?
-  cancelledAt           DateTime?
-  metadata              Json?
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  id                   String               @id @default(uuid())
+  userId               String
+  walletId             String
+  type                 InvestmentPlanType
+  status               InvestmentPlanStatus @default(DRAFT)
+  principalAmount      Decimal              @db.Decimal(30, 8)
+  expectedReturnAmount Decimal              @default(0) @db.Decimal(30, 8)
+  interestRate         Decimal              @db.Decimal(10, 6)
+  durationDays         Int?
+  accrualStartAt       DateTime?
+  maturityAt           DateTime?
+  lastAccruedAt        DateTime?
+  cancelledAt          DateTime?
+  metadata             Json?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
 
-  user                  User                 @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  wallet                Wallet               @relation(fields: [walletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([userId, status])
   @@index([walletId])
@@ -400,45 +443,44 @@ model InvestmentPlan {
 }
 
 model KycProfile {
-  id          String    @id @default(uuid())
-  userId      String    @unique
+  id     String @id @default(uuid())
+  userId String @unique
 
-  verified     Boolean  @default(false)
-  status      KycStatus @default(NOT_STARTED)
+  verified Boolean   @default(false)
+  status   KycStatus @default(NOT_STARTED)
 
   lastVerifiedAt DateTime?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   verifications KycVerification[]
 
- 
   @@index([status])
 }
 
 model KycVerification {
-  id              String                 @id @default(uuid())
-  userId          String
-  kycProfileId    String
+  id           String @id @default(uuid())
+  userId       String
+  kycProfileId String
 
-  type            KycVerificationType
-  status          KycVerificationStatus @default(PENDING)
+  type   KycVerificationType
+  status KycVerificationStatus @default(PENDING)
 
-  provider        String                 @db.VarChar(64)
-  providerRef     String?                @db.VarChar(128)
+  provider    String  @db.VarChar(64)
+  providerRef String? @db.VarChar(128)
 
-  submittedData   Json
+  submittedData    Json
   providerResponse Json?
 
-  failureReason   String?                @db.VarChar(255)
+  failureReason String? @db.VarChar(255)
 
-  createdAt       DateTime               @default(now())
-  reviewedAt      DateTime?
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
 
-  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  kycProfile      KycProfile             @relation(fields: [kycProfileId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kycProfile KycProfile @relation(fields: [kycProfileId], references: [id], onDelete: Cascade)
 
   @@index([userId, type])
   @@index([status, createdAt])

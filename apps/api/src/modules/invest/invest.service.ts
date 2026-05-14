@@ -2,7 +2,7 @@ import { InvestmentPlanStatus, Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { AppError } from '../../utils/ErrorHandler';
 import { WalletRepository } from '../wallet/wallet.repository';
-import type { IInvestmentStrategy, InvestmentPlanKey } from './external/IInvestmentStrategy';
+import type { IInvestmentStrategy, InvestmentPlanKey } from './external/interface/IInvestmentStrategy';
 import type { PortfolioQueryInput, SubscribeInput, WithdrawParamsInput } from './http/invest.schema';
 import { InvestRepository } from './invest.repository';
 

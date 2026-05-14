@@ -41,7 +41,7 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [fastify.authenticate, validateRequest('query', balanceQuerySchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('query', balanceQuerySchema)]
     },
     walletController.getBalance
   );
@@ -56,7 +56,7 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [fastify.authenticate, validateRequest('body', transferSchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('body', transferSchema)]
     },
     walletController.transferP2P
   );
@@ -71,7 +71,7 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [fastify.authenticate, validateRequest('body', depositSchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('body', depositSchema)]
     },
     walletController.depositFiat
   );
@@ -85,7 +85,7 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [fastify.authenticate, validateRequest('params', paymentReferenceParamsSchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('params', paymentReferenceParamsSchema)]
     },
     walletController.verifyFiatDeposit
   );
@@ -100,7 +100,7 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [fastify.authenticate, validateRequest('body', withdrawSchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('body', withdrawSchema)]
     },
     walletController.withdrawFiat
   );
@@ -115,7 +115,7 @@ export const walletRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '1 minute'
         }
       },
-      preHandler: [fastify.authenticate, validateRequest('query', transactionsQuerySchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('query', transactionsQuerySchema)]
     },
     walletController.getTransactions
   );

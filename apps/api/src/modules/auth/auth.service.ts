@@ -51,6 +51,7 @@ export class AuthService {
 
         queuePublishEmail(createdAccount.user.firstName, subject, body);
         queueVirtualAccountCreation({
+          userId: createdAccount.user.id,
           firstName: createdAccount.user.firstName,
           email: createdAccount.user.email,
           lastName: createdAccount.user.lastName,

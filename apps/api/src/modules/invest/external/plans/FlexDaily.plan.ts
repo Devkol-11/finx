@@ -1,5 +1,5 @@
 import { InvestmentPlanType, Prisma } from '@prisma/client';
-import type { IInvestmentStrategy } from '../IInvestmentStrategy';
+import type { IInvestmentStrategy } from '../interface/IInvestmentStrategy';
 
 export class FlexDailyPlan implements IInvestmentStrategy {
   public readonly key = 'FLEX_DAILY' as const;

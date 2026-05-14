@@ -1,10 +1,10 @@
-import type { FastifyPluginAsync } from "fastify";
-import { prisma } from "../../../lib/prisma";
-import { validateRequest } from "../../../utils/validateRequest";
-import { AuthRepository } from "../auth.repository";
-import { AuthService } from "../auth.service";
+import type { FastifyPluginAsync } from 'fastify';
+import { prisma } from '../../../lib/prisma';
+import { validateRequest } from '../../../utils/validateRequest';
+import { AuthRepository } from '../auth.repository';
+import { AuthService } from '../auth.service';
 
-import { AuthController } from "./auth.controller";
+import { AuthController } from './auth.controller';
 import {
   forgotSchema,
   forgotRouteSchema,
@@ -14,8 +14,8 @@ import {
   registerSchema,
   registerRouteSchema,
   resetSchema,
-  resetRouteSchema,
-} from "./auth.schema";
+  resetRouteSchema
+} from './auth.schema';
 
 /**
  * Route composition for the Auth module.
@@ -26,89 +26,89 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   const authController = new AuthController(authService);
 
   fastify.post(
-    "/register",
+    '/register',
     {
       schema: registerRouteSchema,
       config: {
         rateLimit: {
           max: 5,
-          timeWindow: "1 minute",
-        },
+          timeWindow: '1 minute'
+        }
       },
-      preHandler: [validateRequest("body", registerSchema)],
+      preHandler: [validateRequest('body', registerSchema)]
     },
     authController.register
   );
 
   fastify.post(
-    "/login",
+    '/login',
     {
       schema: loginRouteSchema,
       config: {
         rateLimit: {
           max: 10,
-          timeWindow: "1 minute",
-        },
+          timeWindow: '1 minute'
+        }
       },
-      preHandler: [validateRequest("body", loginSchema)],
+      preHandler: [validateRequest('body', loginSchema)]
     },
     authController.login
   );
 
   fastify.post(
-    "/refresh",
+    '/refresh',
     {
       schema: refreshRouteSchema,
       config: {
         rateLimit: {
           max: 20,
-          timeWindow: "1 minute",
-        },
-      },
+          timeWindow: '1 minute'
+        }
+      }
     },
     authController.refresh
   );
 
   fastify.post(
-    "/logout",
+    '/logout',
     {
       config: {
         rateLimit: {
           max: 20,
-          timeWindow: "1 minute",
-        },
+          timeWindow: '1 minute'
+        }
       },
-      preHandler: [fastify.authenticate],
+      preHandler: [async (request, reply) => fastify.authenticate(request, reply)]
     },
     authController.logout
   );
 
   fastify.post(
-    "/forgot-password",
+    '/forgot-password',
     {
       // schema: forgotRouteSchema,
       config: {
         rateLimit: {
           max: 3,
-          timeWindow: "15 minutes",
-        },
+          timeWindow: '15 minutes'
+        }
       },
-      preHandler: [validateRequest("body", forgotSchema)],
+      preHandler: [validateRequest('body', forgotSchema)]
     },
     authController.forgotPassword
   );
 
   fastify.post(
-    "/reset-password",
+    '/reset-password',
     {
       // schema: resetRouteSchema,
       config: {
         rateLimit: {
           max: 5,
-          timeWindow: "15 minutes",
-        },
+          timeWindow: '15 minutes'
+        }
       },
-      preHandler: [validateRequest("body", resetSchema)],
+      preHandler: [validateRequest('body', resetSchema)]
     },
     authController.resetPassword
   );
