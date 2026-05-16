@@ -2,10 +2,10 @@ import { Worker, QueueEvents } from 'bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES, QueueName, JOB_NAMES } from '../queues/queue.registry';
 import { handleEmailJob } from './handlers/email.handler';
-import { handlePaymentJob } from './handlers/payment.handler';
+import { capturePaymentWorker } from './handlers/payment.handler';
 import { env } from '../config/env';
 import { appConfig } from '../config/app.config';
-import { handleVirtualAccountJob } from './handlers/virtual.account.handler';
+
 import { handleKycJob } from './handlers/kyc.handler';
 
 const workers = new Map<QueueName, Worker>();
@@ -20,11 +20,9 @@ const queueHandlers: Record<QueueName, Record<string, QueueHandler>> = {
     [JOB_NAMES.EMAIL.SEND]: handleEmailJob
   },
   [QUEUE_NAMES.PAYMENT]: {
-    [JOB_NAMES.PAYMENT.CAPTURE]: handlePaymentJob
+    [JOB_NAMES.PAYMENT.CAPTURE]: capturePaymentWorker
   },
-  [QUEUE_NAMES.VIRTUAL_ACCOUNT_CREATION]: {
-    [JOB_NAMES.VIRTUAL_ACCOUNT_CREATION.CREATE]: handleVirtualAccountJob
-  },
+
   [QUEUE_NAMES.KYC_PROFILE_VERIFICATION]: {
     [JOB_NAMES.KYC_PROFILE_VERIFICATION.VERIFY]: handleKycJob
   }
@@ -51,14 +49,6 @@ const processJob = async (job: Job<unknown>): Promise<unknown> => {
 
   if (!job.data || typeof job.data !== 'object') {
     throw new Error('Invalid job payload: must be a non-null object');
-  }
-
-  if (appConfig.isDev) {
-    console.log(`[WORKER] ${queueName} job started`, {
-      jobId: job.id,
-      name: jobName,
-      data: job.data
-    });
   }
 
   return handler(job.data);

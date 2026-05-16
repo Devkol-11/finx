@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { PaymentStatus, PaymentType } from '@prisma/client';
+import { PaymentProvider } from '@prisma/client';
 import { AppError } from '../../utils/ErrorHandler';
 import type { IPaymentProvider } from './external/interfaces/IPaymentProvider';
 import type { BalanceQueryInput, DepositInput, TransactionsQueryInput, TransferInput, WithdrawInput } from './http/wallet.schema';
@@ -88,7 +89,7 @@ export class WalletService {
       return {
         message: 'Deposit session retrieved successfully.',
         data: {
-          provider: 'paystack',
+          provider: PaymentProvider.PAYSTACK,
           reference: intentResult.paymentIntent.reference,
           authorizationUrl: intentResult.paymentIntent.authorizationUrl,
           accessCode: intentResult.paymentIntent.accessCode,

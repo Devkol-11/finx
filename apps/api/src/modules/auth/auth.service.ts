@@ -6,11 +6,11 @@ import type { FastifyInstance } from 'fastify';
 import { env } from '../../config/env';
 import { AppError } from '../../utils/ErrorHandler';
 import { EMAIL_TEMPLATES } from '../../utils/emailTemplates';
-import { queuePublishEmail, queueVirtualAccountCreation } from '../pub-sub';
+import { queuePublishEmail } from '../pub-sub';
 import { mapJwtError } from '../../plugins/auth';
 import { AuthRepository } from './auth.repository';
-
 import type { ForgotInput, LoginInput, RegisterInput, ResetInput } from './http/auth.schema';
+import logger from '../../utils/logger';
 
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = 15;
 const MAX_FINX_TAG_GENERATION_ATTEMPTS = 10;
@@ -25,9 +25,13 @@ type SessionMetadata = {
  * Auth service contains the business rules for account onboarding and access.
  */
 export class AuthService {
-  constructor(private readonly authRepository: AuthRepository, private readonly fastify: FastifyInstance) {}
+  constructor(private readonly authRepository: AuthRepository, private readonly jwt: FastifyInstance['jwt']) {}
 
   public async register(input: RegisterInput, sessionMetadata?: SessionMetadata) {
+    logger.info('[AUTH] register called', {
+      email: input.email,
+      attempt: 0
+    });
     const existingUser = await this.authRepository.findUserByEmail(input.email);
 
     if (existingUser) {
@@ -39,23 +43,33 @@ export class AuthService {
     });
 
     for (let attempt = 0; attempt < MAX_FINX_TAG_GENERATION_ATTEMPTS; attempt += 1) {
+      logger.info('[AUTH] generating finxTag', { attempt });
       const finxTag = await this.generateUniqueFinxTag(input, attempt);
 
       try {
         const createdAccount = await this.authRepository.registerUserWithWallet(input, passwordHash, finxTag);
+
+        logger.info('[AUTH] user created successfully', {
+          userId: createdAccount.user.id,
+          walletId: createdAccount.wallet.id
+        });
 
         const authBundle = await this.createSessionBundle(createdAccount.user.id, createdAccount.user.email, sessionMetadata);
 
         const subject = EMAIL_TEMPLATES.REGISTERED.subject(createdAccount.user.firstName);
         const body = EMAIL_TEMPLATES.REGISTERED.body(createdAccount.user.firstName);
 
-        queuePublishEmail(createdAccount.user.firstName, subject, body);
-        queueVirtualAccountCreation({
-          userId: createdAccount.user.id,
-          firstName: createdAccount.user.firstName,
-          email: createdAccount.user.email,
-          lastName: createdAccount.user.lastName,
-          phoneNumber: createdAccount.user.phoneNumber
+        logger.info('[AUTH] queueing welcome email', {
+          email: createdAccount.user.email
+        });
+        await queuePublishEmail({
+          to: createdAccount.user.email,
+          subject,
+          body
+        });
+
+        logger.info('[AUTH] registration completed', {
+          userId: createdAccount.user.id
         });
 
         return {
@@ -244,7 +258,7 @@ export class AuthService {
       };
     }
 
-    const rawToken = randomBytes(32).toString('hex');
+    const rawToken = this.generateResetPasswordToken();
     const tokenHash = this.hashResetToken(rawToken);
     const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MINUTES * 60 * 1000);
 
@@ -257,7 +271,11 @@ export class AuthService {
     const subject = EMAIL_TEMPLATES.PASSWORD_RESET.subject(user.firstName);
     const body = EMAIL_TEMPLATES.PASSWORD_RESET.body(user.firstName, rawToken);
 
-    queuePublishEmail(user.email, subject, body);
+    queuePublishEmail({
+      to: user.email,
+      subject,
+      body
+    });
 
     return {
       message: 'If the account exists, a password reset email has been sent.'
@@ -291,10 +309,20 @@ export class AuthService {
 
     const fallbackBase = normalizedBase.length > 0 ? normalizedBase : 'finxuser';
 
+    logger.debug('[FINX_TAG] base generated', {
+      fallbackBase,
+      attempt
+    });
+
     for (let candidateAttempt = attempt; candidateAttempt < MAX_FINX_TAG_GENERATION_ATTEMPTS; candidateAttempt += 1) {
       const suffix = candidateAttempt === 0 ? '' : `${randomInt(1000, 10000)}`;
       const candidate = `${fallbackBase}${suffix}`.slice(0, 32);
+      logger.debug('[FINX_TAG] checking candidate', { candidate });
       const exists = await this.authRepository.existsByFinxTag(candidate);
+      logger.debug('[FINX_TAG] exists check result', {
+        candidate,
+        exists
+      });
 
       if (!exists) {
         return candidate;
@@ -307,6 +335,10 @@ export class AuthService {
   }
 
   private async createSessionBundle(userId: string, email: string, sessionMetadata?: SessionMetadata) {
+    logger.info('[AUTH] creating session bundle', {
+      userId
+    });
+
     const sessionId = randomUUID();
     const refreshToken = this.issueRefreshToken({
       userId,
@@ -330,7 +362,7 @@ export class AuthService {
   }
 
   private async issueAccessToken(userId: string, email: string, sessionId: string): Promise<string> {
-    return this.fastify.jwt.sign(
+    return this.jwt.sign(
       {
         userId,
         email,
@@ -343,7 +375,7 @@ export class AuthService {
   }
 
   private issueRefreshToken(input: { userId: string; sessionId: string }): string {
-    return this.fastify.jwt.sign(
+    return this.jwt.sign(
       {
         userId: input.userId,
         sessionId: input.sessionId,
@@ -362,7 +394,7 @@ export class AuthService {
     type?: string;
   } {
     try {
-      return this.fastify.jwt.verify(refreshToken, {
+      return this.jwt.verify(refreshToken, {
         key: env.JWT_REFRESH_SECRET
       }) as {
         userId: string;
@@ -377,6 +409,12 @@ export class AuthService {
     }
   }
 
+  private generateResetPasswordToken() {
+    const num = randomInt(0, 1000000);
+
+    return num.toString().padStart(6, '0');
+  }
+
   private hashRefreshToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
@@ -387,12 +425,6 @@ export class AuthService {
 
   private hashResetToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
-  }
-
-  private dispatchEmail(to: string, subject: string, body: string): void {
-    void queuePublishEmail(to, subject, body).catch((error) => {
-      this.fastify.log.warn({ err: error, to }, 'Failed to enqueue email notification.');
-    });
   }
 
   private isFinxTagConflict(error: any): boolean {

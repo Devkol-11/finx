@@ -2,25 +2,24 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyRequest } from 'fastify';
+import jwt from '@fastify/jwt';
+import cookie from '@fastify/cookie';
 import { env } from './config/env';
+import { getRedisApi } from './lib/redis';
 import { prisma } from './lib/prisma';
 import { pingRedis } from './lib/redis';
 import { authRoutes } from './modules/auth/http/auth.routes';
-import { investRoutes } from './modules/invest/http/invest.routes';
 import { recordHttpError, recordHttpRequest, renderPrometheusMetrics } from './modules/observability/metrics';
 import { paymentRoutes } from './modules/payments/http/payment.routes';
 import { walletRoutes } from './modules/wallet/http/wallet.routes';
 import { authPlugin } from './plugins/auth';
 import { errorPlugin } from './plugins/errorPlugin';
+import { webhookRoutes } from './modules/webhooks/http/webhook.route';
+import { mapJwtError } from './plugins/auth';
+import { AppError } from './utils/ErrorHandler';
 
 const requestStarts = new WeakMap<FastifyRequest, bigint>();
 
-/**
- * Factory that assembles the API process with infrastructure-only concerns.
- *
- * Feature modules are intentionally deferred so the bootstrap remains a clean
- * foundation for later bounded-context registration.
- */
 export const buildApp = async () => {
   const app = Fastify({
     logger: {
@@ -42,23 +41,6 @@ export const buildApp = async () => {
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId'
   });
-
-  // app.addContentTypeParser(
-  //   'application/json',
-  //   {
-  //     parseAs: 'buffer'
-  //   },
-  //   (request: FastifyRequest & { rawBody?: string }, body, done) => {
-  //     const rawBody = body.toString('utf8');
-  //     request.rawBody = rawBody;
-
-  //     try {
-  //       done(null, rawBody.length > 0 ? JSON.parse(rawBody) : {});
-  //     } catch (error) {
-  //       done(error as Error, undefined);
-  //     }
-  //   }
-  // );
 
   app.addHook('onRequest', async (request) => {
     requestStarts.set(request, process.hrtime.bigint());
@@ -99,8 +81,106 @@ export const buildApp = async () => {
     });
   });
 
-  await app.register(errorPlugin);
-  await app.register(authPlugin);
+  app.decorate('authenticate', async (request, reply): Promise<void> => {
+    try {
+      await request.jwtVerify();
+    } catch (error) {
+      throw mapJwtError(error, {
+        expiredCode: 'ACCESS_TOKEN_EXPIRED',
+        invalidCode: 'INVALID_ACCESS_TOKEN'
+      });
+    }
+
+    if (!request.user || typeof request.user.userId !== 'string' || typeof request.user.sessionId !== 'string' || request.user.type === 'refresh') {
+      throw new AppError('Authentication token is invalid.', 401, {
+        code: 'INVALID_ACCESS_TOKEN'
+      });
+    }
+
+    const cache = getRedisApi();
+    const constructSessionCacheKey = (userId: string) => `session:${userId}`;
+    const cacheKey = constructSessionCacheKey(request.user.userId);
+
+    let session = null;
+    const cachedSession = await cache.get(cacheKey);
+
+    if (cachedSession) {
+      try {
+        const parsed = JSON.parse(cachedSession);
+        if (parsed.id === request.user.sessionId && parsed.user.status === 'ACTIVE' && new Date(parsed.expiresAt) > new Date()) {
+          session = parsed;
+        } else {
+          if (parsed.user.status !== 'ACTIVE') {
+            reply.clearCookie(env.REFRESH_TOKEN_COOKIE_NAME, {
+              path: '/api/v1/auth',
+              ...(env.COOKIE_DOMAIN
+                ? {
+                    domain: env.COOKIE_DOMAIN
+                  }
+                : {})
+            });
+          }
+          await cache.del(cacheKey);
+        }
+      } catch (error) {
+        await cache.del(cacheKey);
+      }
+    }
+
+    if (!session) {
+      session = await prisma.session.findFirst({
+        where: {
+          id: request.user.sessionId,
+          userId: request.user.userId,
+          revokedAt: null,
+          expiresAt: {
+            gt: new Date()
+          },
+          user: {
+            deletedAt: null
+          }
+        },
+        include: {
+          user: true
+        }
+      });
+
+      if (session) {
+        await cache.setex(cacheKey, 3600, JSON.stringify(session));
+      }
+    }
+
+    if (!session || session.user.status !== 'ACTIVE') {
+      reply.clearCookie(env.REFRESH_TOKEN_COOKIE_NAME, {
+        path: '/api/v1/auth',
+        ...(env.COOKIE_DOMAIN
+          ? {
+              domain: env.COOKIE_DOMAIN
+            }
+          : {})
+      });
+
+      throw new AppError('Your session is no longer valid.', 401, {
+        code: 'SESSION_REVOKED'
+      });
+    }
+
+    if (session.userId !== request.user.userId) {
+      throw new AppError('Authentication token is invalid.', 401, {
+        code: 'INVALID_ACCESS_TOKEN'
+      });
+    }
+
+    request.authSession = session;
+  });
+
+  app.decorateRequest('authSession', null);
+
+  await app.register(cookie);
+
+  await app.register(jwt, {
+    secret: env.JWT_ACCESS_SECRET
+  });
 
   await app.register(helmet, {
     global: true,
@@ -198,6 +278,9 @@ export const buildApp = async () => {
     void reply.header('Content-Type', 'text/plain; version=0.0.4').send(renderPrometheusMetrics());
   });
 
+  await app.register(errorPlugin);
+  await app.register(authPlugin);
+
   await app.register(authRoutes, {
     prefix: '/api/v1/auth'
   });
@@ -210,8 +293,8 @@ export const buildApp = async () => {
     prefix: '/api/v1/payments'
   });
 
-  await app.register(investRoutes, {
-    prefix: '/api/v1/invest'
+  await app.register(webhookRoutes, {
+    prefix: '/api/v1/webhooks'
   });
 
   return app;

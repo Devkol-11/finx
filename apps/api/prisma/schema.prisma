@@ -151,6 +151,12 @@ enum VirtualAccountStatus {
   DEACTIVATED
 }
 
+enum WebhookEventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
 model User {
   id              String     @id @default(uuid())
   email           String     @unique @db.VarChar(320)
@@ -381,7 +387,7 @@ model WebhookEvent {
 
   payload Json
 
-  processed   Boolean   @default(false)
+  status   WebhookEventStatus   
   processedAt DateTime?
 
   receivedAt DateTime @default(now())

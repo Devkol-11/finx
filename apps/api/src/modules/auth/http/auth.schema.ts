@@ -38,7 +38,7 @@ export const forgotSchema = z.object({
 
 export const resetSchema = z
   .object({
-    token: z.string().trim().min(32).max(256),
+    token: z.string().trim().min(6).max(32),
     newPassword: z
       .string()
       .min(8)

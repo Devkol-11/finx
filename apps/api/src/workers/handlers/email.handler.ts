@@ -23,7 +23,7 @@ export async function handleEmailJob(input: unknown) {
     throw new Error('Invalid email job payload');
   }
 
-  const sender = appConfig.isDev ? 'onboarding@resend.dev' : 'noreply@yourdomain.com'; 
+  const sender = appConfig.isDev ? 'onboarding@resend.dev' : 'noreply@yourdomain.com';
   const receiver = appConfig.isDev ? 'bethelcollins100@gmail.com' : payload.to;
 
   const { data, error } = await resend.emails.send({
@@ -35,7 +35,7 @@ export async function handleEmailJob(input: unknown) {
 
   if (error) {
     console.error('[EMAIL ERROR]', error);
-    throw new Error('Failed to send email');
+    return;
   }
 
   console.log('[EMAIL SENT]', {

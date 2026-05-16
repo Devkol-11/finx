@@ -4,7 +4,6 @@ import { env } from '../config/env';
 export const QUEUE_NAMES = {
   EMAIL: 'email',
   PAYMENT: 'payment',
-  VIRTUAL_ACCOUNT_CREATION: 'virtual_account',
   KYC_PROFILE_VERIFICATION: 'kyc_profile'
 } as const;
 
@@ -18,9 +17,6 @@ export const JOB_NAMES = {
     CAPTURE: 'capture-payment'
   },
 
-  VIRTUAL_ACCOUNT_CREATION: {
-    CREATE: 'create-virtual-account'
-  },
   KYC_PROFILE_VERIFICATION: {
     VERIFY: 'verify-kyc-result'
   }

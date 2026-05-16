@@ -1,16 +1,20 @@
 import { z } from 'zod';
 
-export const paystackWebhookSchema = z
-  .object({
-    event: z.string().trim().min(1),
+export const paystackWebhookSchema = z.object({
+  event: z.enum([
+    'charge.success',
+    'transfer.success',
+    'transfer.failed',
+    'transfer.reversed',
+    'customeridentification.success',
+    'customeridentification.failed'
+  ]),
 
-    data: z
-      .object({
-        reference: z.string().trim().min(1).optional(),
-        transfer_code: z.string().trim().min(1).optional()
-      })
-      .catchall(z.unknown())
-  })
-  .catchall(z.unknown());
+  data: z
+    .object({
+      id: z.union([z.number(), z.string()])
+    })
+    .catchall(z.unknown())
+});
 
 export type PaystackWebhookInput = z.infer<typeof paystackWebhookSchema>;

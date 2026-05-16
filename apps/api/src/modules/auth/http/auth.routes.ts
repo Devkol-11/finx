@@ -22,7 +22,7 @@ import {
  */
 export const authRoutes: FastifyPluginAsync = async (fastify) => {
   const authRepository = new AuthRepository(prisma);
-  const authService = new AuthService(authRepository, fastify);
+  const authService = new AuthService(authRepository, fastify.jwt);
   const authController = new AuthController(authService);
 
   fastify.post(
@@ -86,14 +86,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     '/forgot-password',
     {
-      // schema: forgotRouteSchema,
       config: {
         rateLimit: {
           max: 3,
           timeWindow: '15 minutes'
         }
       },
-      preHandler: [validateRequest('body', forgotSchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('body', forgotSchema)]
     },
     authController.forgotPassword
   );
@@ -108,7 +107,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
           timeWindow: '15 minutes'
         }
       },
-      preHandler: [validateRequest('body', resetSchema)]
+      preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('body', resetSchema)]
     },
     authController.resetPassword
   );

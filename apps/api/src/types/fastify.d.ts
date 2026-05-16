@@ -39,6 +39,6 @@ declare module 'fastify' {
 
 declare module 'fastify' {
   interface FastifyRequest {
-    rawbody?: string;
+    rawBody?: string;
   }
 }

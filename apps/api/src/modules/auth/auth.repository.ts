@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient, SessionRevocationReason, UserStatus, WalletCurrency, WalletType } from '@prisma/client';
 import type { ForgotInput, RegisterInput } from './http/auth.schema';
+import logger from '../../utils/logger';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -85,6 +86,10 @@ export class AuthRepository {
   }
 
   public async registerUserWithWallet(input: RegisterInput, passwordHash: string, finxTag: string) {
+    logger.info('[AUTH] creating user + wallet', {
+      email: input.email,
+      finxTag
+    });
     return this.prisma.$transaction(async (transaction) => {
       const createdUser = await transaction.user.create({
         data: {

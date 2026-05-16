@@ -62,6 +62,7 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
     };
     const prismaMappedError = mapPrismaError(error);
 
+    // 1. Handle Known Operational App Errors First
     if (error instanceof AppError) {
       const payload = buildResponse(error.statusCode, error.message, error.code ?? 'APPLICATION_ERROR', error.details);
 
@@ -78,8 +79,62 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
       return;
     }
 
-    if (error instanceof ZodError) {
-      const payload = formatZodError(error);
+    // BULLETPROOF ZOD VALIDATION LAYER WITH FAIL-SAFE FALLBACK
+
+    const errAny = error as any;
+    const isNativeZod =
+      error instanceof ZodError ||
+      errAny?.name === 'ZodError' ||
+      errAny?.name === '$ZodError' ||
+      (Array.isArray(errAny?.issues) && errAny.issues.length > 0);
+
+    let normalizedZodError = error;
+    let isStringifiedZod = false;
+
+    if (!isNativeZod && typeof errAny?.message === 'string' && errAny.message.trim().startsWith('[')) {
+      try {
+        const parsedIssues = JSON.parse(errAny.message);
+        if (Array.isArray(parsedIssues) && parsedIssues.length > 0 && ('code' in parsedIssues[0] || 'origin' in parsedIssues[0])) {
+          isStringifiedZod = true;
+          normalizedZodError = new ZodError(parsedIssues);
+        }
+      } catch {
+        // Fall through safely if parsing fails
+      }
+    }
+
+    if (isNativeZod || isStringifiedZod) {
+      if (!Array.isArray((normalizedZodError as any).issues) && errAny?.issues) {
+        (normalizedZodError as any).issues = errAny.issues;
+      }
+
+      let payload;
+      try {
+        // Attempt to format using your custom utility function
+        payload = formatZodError(normalizedZodError as ZodError);
+      } catch (formatterError) {
+        // FAIL-SAFE: If formatZodError crashes due to Zod v4 structural differences,
+        // we safely catch it and format a clean response manually right here!
+        let rawIssues = (normalizedZodError as any).issues;
+        if (!Array.isArray(rawIssues) && typeof (normalizedZodError as any).message === 'string') {
+          try {
+            rawIssues = JSON.parse((normalizedZodError as any).message);
+          } catch {}
+        }
+
+        payload = {
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Validation failed.',
+          code: 'ZOD_VALIDATION_ERROR',
+          details: Array.isArray(rawIssues)
+            ? rawIssues.map((iss: any) => ({
+                field: Array.isArray(iss.path) ? iss.path.join('.') : 'unknown',
+                message: iss.message || 'Invalid input value.'
+              }))
+            : null
+        };
+      }
 
       request.log.warn(
         {
@@ -87,13 +142,15 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
           code: payload.code,
           details: payload.details
         },
-        'Zod validation error handled.'
+        'Zod validation error handled safely.'
       );
 
       void reply.status(payload.statusCode).send(payload);
       return;
     }
+    // ==========================================
 
+    // 3. Handle Database / Prisma Failures
     if (prismaMappedError) {
       request.log.error(
         {
@@ -108,6 +165,7 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
       return;
     }
 
+    // 4. Handle Fastify Internal Validation Errors (e.g. built-in AJV schemas)
     if (isFastifyValidationError(fastifyError)) {
       const validationError = fastifyError as FastifyError & {
         validation?: unknown[];
@@ -132,6 +190,7 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
       return;
     }
 
+    // 5. Handle Rate Limit Triggers
     if (fastifyError.statusCode === 429) {
       const payload = buildResponse(429, fastifyError.message || 'Too many requests.', 'RATE_LIMIT_EXCEEDED');
       request.log.warn({ err: error, code: payload.code }, 'Rate limit error handled.');
@@ -139,6 +198,7 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
       return;
     }
 
+    // 6. Final Catch-All / Fallback Layer (Unhandeld 500s)
     const statusCode = fastifyError.statusCode && fastifyError.statusCode >= 400 ? fastifyError.statusCode : 500;
 
     const payload = buildResponse(
