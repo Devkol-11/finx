@@ -1,0 +1,39 @@
+{"level":"info","message":"Prisma Database connected","timestamp":"2026-05-13 12:48:21"}
+{"level":"info","message":"Prisma Database connected","timestamp":"2026-05-13 13:10:52"}
+{"clientVersion":"7.8.0","code":"P2020","level":"error","message":"\nInvalid `prisma.webhookEvent.findFirst()` invocation in\nC:\\Users\\HP\\Desktop\\finx\\apps\\api\\src\\modules\\webhooks\\repository\\webhook.repository.ts:11:56\n\n   8 export async function processIdempodentWebhook(input: { providerEventId: number; payload: object; eventType: string; reply: FastifyReply }) {\n   9   try {\n  10     const { payload, providerEventId, eventType, reply } = input;\n→ 11     const alreadyProcessed = await prisma.webhookEvent.findFirst(\nValue out of range for the type: value \"6149540364\" is out of range for type integer","meta":{"driverAdapterError":{"cause":{"cause":"value \"6149540364\" is out of range for type integer","kind":"ValueOutOfRange","originalCode":"22003","originalMessage":"value \"6149540364\" is out of range for type integer"},"name":"DriverAdapterError"},"modelName":"WebhookEvent"},"name":"PrismaClientKnownRequestError","stack":"PrismaClientKnownRequestError: \nInvalid `prisma.webhookEvent.findFirst()` invocation in\nC:\\Users\\HP\\Desktop\\finx\\apps\\api\\src\\modules\\webhooks\\repository\\webhook.repository.ts:11:56\n\n   8 export async function processIdempodentWebhook(input: { providerEventId: number; payload: object; eventType: string; reply: FastifyReply }) {\n   9   try {\n  10     const { payload, providerEventId, eventType, reply } = input;\n→ 11     const alreadyProcessed = await prisma.webhookEvent.findFirst(\nValue out of range for the type: value \"6149540364\" is out of range for type integer\n    at zr.handleRequestError (C:\\Users\\HP\\Desktop\\finx\\node_modules\\.pnpm\\@prisma+client@7.8.0_prisma_8386e61a6b58a9fb107b3550c4779d9a\\node_modules\\@prisma\\client\\src\\runtime\\RequestHandler.ts:237:13)\n    at zr.handleAndLogRequestError (C:\\Users\\HP\\Desktop\\finx\\node_modules\\.pnpm\\@prisma+client@7.8.0_prisma_8386e61a6b58a9fb107b3550c4779d9a\\node_modules\\@prisma\\client\\src\\runtime\\RequestHandler.ts:183:12)\n    at zr.request (C:\\Users\\HP\\Desktop\\finx\\node_modules\\.pnpm\\@prisma+client@7.8.0_prisma_8386e61a6b58a9fb107b3550c4779d9a\\node_modules\\@prisma\\client\\src\\runtime\\RequestHandler.ts:152:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)\n    at async a (C:\\Users\\HP\\Desktop\\finx\\node_modules\\.pnpm\\@prisma+client@7.8.0_prisma_8386e61a6b58a9fb107b3550c4779d9a\\node_modules\\@prisma\\client\\src\\runtime\\getPrismaClient.ts:963:24)\n    at async processIdempodentWebhook (C:\\Users\\HP\\Desktop\\finx\\apps\\api\\src\\modules\\webhooks\\repository\\webhook.repository.ts:11:30)","timestamp":"2026-05-15 15:54:18"}
+{"level":"error","message":"NO PAYMENT INTENT FOUND FOR PAYMENT INTENT REFERENCE :  save_unique_ref_001","timestamp":"2026-05-16 03:54:30"}
+{"level":"error","message":"NO PAYMENT INTENT FOUND FOR PAYMENT INTENT REFERENCE :  save_unique_ref_146","timestamp":"2026-05-16 04:18:48"}
+{"attempt":0,"email":"al.xu@domain.io","level":"info","message":"[AUTH] register called","timestamp":"2026-05-16 04:59:51"}
+{"attempt":0,"level":"info","message":"[AUTH] generating finxTag","timestamp":"2026-05-16 05:00:02"}
+{"email":"al.xu@domain.io","finxTag":"alxu","level":"info","message":"[AUTH] creating user + wallet","timestamp":"2026-05-16 05:00:02"}
+{"level":"info","message":"[AUTH] user created successfully","timestamp":"2026-05-16 05:00:07","userId":"9cff2b32-da27-4c9a-8df5-3b5fa36d9dfd","walletId":"2219b89e-d284-472a-966e-6192e8832d5b"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 05:00:07","userId":"9cff2b32-da27-4c9a-8df5-3b5fa36d9dfd"}
+{"attempt":0,"email":"ben.ju@domain.io","level":"info","message":"[AUTH] register called","timestamp":"2026-05-16 20:02:53"}
+{"attempt":0,"level":"info","message":"[AUTH] generating finxTag","timestamp":"2026-05-16 20:02:59"}
+{"email":"ben.ju@domain.io","finxTag":"benju","level":"info","message":"[AUTH] creating user + wallet","timestamp":"2026-05-16 20:03:00"}
+{"level":"info","message":"[AUTH] user created successfully","timestamp":"2026-05-16 20:03:05","userId":"2eaf8b0c-e63c-4f5e-aa8f-e2531c4387e0","walletId":"4ac2131d-e6e3-47ae-b2c1-ad685e9b87c4"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 20:03:05","userId":"2eaf8b0c-e63c-4f5e-aa8f-e2531c4387e0"}
+{"email":"ben.ju@domain.io","level":"info","message":"[AUTH] queueing welcome email","timestamp":"2026-05-16 20:03:06"}
+{"level":"info","message":"[AUTH] registration completed","timestamp":"2026-05-16 20:03:08","userId":"2eaf8b0c-e63c-4f5e-aa8f-e2531c4387e0"}
+{"attempt":0,"email":"xeen.ju@domain.io","level":"info","message":"[AUTH] register called","timestamp":"2026-05-16 20:25:23"}
+{"attempt":0,"level":"info","message":"[AUTH] generating finxTag","timestamp":"2026-05-16 20:25:30"}
+{"email":"xeen.ju@domain.io","finxTag":"xentu","level":"info","message":"[AUTH] creating user + wallet","timestamp":"2026-05-16 20:25:31"}
+{"level":"info","message":"[AUTH] user created successfully","timestamp":"2026-05-16 20:25:32","userId":"d369b002-d9a9-41af-a26d-297245cb66bf","walletId":"4e6815a4-88ce-4623-85a2-57474e8b3125"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 20:25:32","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}
+{"email":"xeen.ju@domain.io","level":"info","message":"[AUTH] queueing welcome email","timestamp":"2026-05-16 20:25:33"}
+{"level":"info","message":"[AUTH] registration completed","timestamp":"2026-05-16 20:25:38","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}
+{"attempt":0,"email":"jen.tu@domain.io","level":"info","message":"[AUTH] register called","timestamp":"2026-05-16 20:30:09"}
+{"attempt":0,"level":"info","message":"[AUTH] generating finxTag","timestamp":"2026-05-16 20:30:15"}
+{"email":"jen.tu@domain.io","finxTag":"jentu","level":"info","message":"[AUTH] creating user + wallet","timestamp":"2026-05-16 20:30:16"}
+{"level":"info","message":"[AUTH] user created successfully","timestamp":"2026-05-16 20:30:20","userId":"7fc1f320-a5b0-4053-989d-b8c9d8ee3517","walletId":"7304825e-0ce6-4764-bf41-f3dfb3f74ad8"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 20:30:20","userId":"7fc1f320-a5b0-4053-989d-b8c9d8ee3517"}
+{"email":"jen.tu@domain.io","level":"info","message":"[AUTH] queueing welcome email","timestamp":"2026-05-16 20:30:21"}
+{"level":"info","message":"[AUTH] registration completed","timestamp":"2026-05-16 20:30:22","userId":"7fc1f320-a5b0-4053-989d-b8c9d8ee3517"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 20:45:21","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 21:18:28","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 22:01:20","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 22:14:00","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 22:23:25","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 22:40:03","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 23:01:34","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}
+{"level":"info","message":"[AUTH] creating session bundle","timestamp":"2026-05-16 23:12:37","userId":"d369b002-d9a9-41af-a26d-297245cb66bf"}

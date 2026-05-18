@@ -1,4 +1,4 @@
-import { ZodError } from "zod";
+import { ZodError } from 'zod';
 
 /**
  * Uniform application-level error for predictable controller/service behavior.
@@ -21,11 +21,11 @@ export class AppError extends Error {
       code?: string;
       details?: unknown;
       cause?: unknown;
-    },
+    }
   ) {
     super(message, options?.cause ? { cause: options.cause } : undefined);
 
-    this.name = "AppError";
+    this.name = 'AppError';
     this.statusCode = statusCode;
     this.isOperational = options?.isOperational ?? true;
     this.code = options?.code;
@@ -36,52 +36,66 @@ export class AppError extends Error {
 
   public static badRequest(message: string, details?: unknown): AppError {
     return new AppError(message, 400, {
-      code: "BAD_REQUEST",
-      details,
+      code: 'BAD_REQUEST',
+      details
     });
   }
 
-  public static unauthorized(message = "Authentication is required."): AppError {
+  public static unauthorized(message = 'Authentication is required.'): AppError {
     return new AppError(message, 401, {
-      code: "UNAUTHORIZED",
+      code: 'UNAUTHORIZED'
     });
   }
 
-  public static forbidden(message = "You do not have permission to perform this action."): AppError {
+  public static forbidden(message = 'You do not have permission to perform this action.'): AppError {
     return new AppError(message, 403, {
-      code: "FORBIDDEN",
+      code: 'FORBIDDEN'
     });
   }
 
-  public static notFound(message = "The requested resource could not be found."): AppError {
+  public static notFound(message = 'The requested resource could not be found.'): AppError {
     return new AppError(message, 404, {
-      code: "NOT_FOUND",
+      code: 'NOT_FOUND'
     });
   }
 
   public static conflict(message: string, details?: unknown): AppError {
     return new AppError(message, 409, {
-      code: "CONFLICT",
-      details,
+      code: 'CONFLICT',
+      details
     });
   }
 
   public static unprocessableEntity(message: string, details?: unknown): AppError {
     return new AppError(message, 422, {
-      code: "UNPROCESSABLE_ENTITY",
-      details,
+      code: 'UNPROCESSABLE_ENTITY',
+      details
+    });
+  }
+
+  public static gatewayTimeout(message: string, details?: unknown): AppError {
+    return new AppError(message, 504, {
+      code: 'GATEWAY TIMEOUT',
+      details
+    });
+  }
+
+  public static webHookFailure(message = 'Webhook Delivery Failure', details?: unknown) {
+    return new AppError(message, 401, {
+      code: 'WEBHOOK_DELIVERY_FAILURE',
+      details
     });
   }
 
   public static internal(
-    message = "An unexpected error occurred.",
-    options?: { cause?: unknown; details?: unknown; isOperational?: boolean },
+    message = 'An unexpected error occurred.',
+    options?: { cause?: unknown; details?: unknown; isOperational?: boolean }
   ): AppError {
     return new AppError(message, 500, {
-      code: "INTERNAL_SERVER_ERROR",
-      cause: options?.cause,
+      code: 'INTERNAL_SERVER_ERROR',
+      cause: options?.cause ?? '',
       details: options?.details,
-      isOperational: options?.isOperational ?? false,
+      isOperational: options?.isOperational ?? false
     });
   }
 }
@@ -102,12 +116,12 @@ export interface StandardErrorResponse {
  */
 export const formatZodError = (error: ZodError): StandardErrorResponse => ({
   statusCode: 400,
-  error: "Bad Request",
-  message: "Request validation failed.",
-  code: "VALIDATION_ERROR",
+  error: 'Bad Request',
+  message: 'Request validation failed.',
+  code: 'VALIDATION_ERROR',
   details: error.issues.map((issue) => ({
-    path: issue.path.join("."),
+    path: issue.path.join('.'),
     message: issue.message,
-    code: issue.code,
-  })),
+    code: issue.code
+  }))
 });

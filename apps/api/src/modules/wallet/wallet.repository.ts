@@ -3,18 +3,20 @@ import {
   LedgerEntryDirection,
   LedgerTransactionStatus,
   LedgerTransactionType,
+  PaymentDirection,
+  PaymentEventType,
+  PaymentProvider,
+  PaymentStatus,
+  PaymentType,
   Prisma,
   PrismaClient,
   WalletCurrency,
-  WalletType,
-} from "@prisma/client";
-import { AppError } from "../../utils/ErrorHandler";
-import type {
-  BalanceQueryInput,
-  TransactionsQueryInput,
-  TransferInput,
-  WithdrawInput,
-} from "./http/wallet.schema";
+  WalletType
+} from '@prisma/client';
+import { assertPaymentTransition } from '../payments/payment-state';
+import { AppError } from '../../utils/ErrorHandler';
+import type { BalanceQueryInput, DepositInput, TransactionsQueryInput, TransferInput, WithdrawInput } from './http/wallet.schema';
+import type { InitiateDepositResult, TransferToBankResult, VerifyTransactionResult } from './external/interfaces/IPaymentProvider';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -27,8 +29,8 @@ export class WalletRepository {
         userId,
         currency,
         type: WalletType.FIAT,
-        isActive: true,
-      },
+        isActive: true
+      }
     });
   }
 
@@ -40,12 +42,12 @@ export class WalletRepository {
         isActive: true,
         user: {
           finxTag,
-          deletedAt: null,
-        },
+          deletedAt: null
+        }
       },
       include: {
-        user: true,
-      },
+        user: true
+      }
     });
   }
 
@@ -53,7 +55,7 @@ export class WalletRepository {
     const wallet = await this.findUserWalletByUserId(userId, input.currency as WalletCurrency);
 
     if (!wallet) {
-      throw AppError.notFound("Wallet not found.");
+      throw AppError.notFound('Wallet not found.');
     }
 
     const recentActivity = await this.prisma.ledgerTransaction.findMany({
@@ -61,25 +63,22 @@ export class WalletRepository {
         currency: input.currency as WalletCurrency,
         entries: {
           some: {
-            OR: [
-              { debitWalletId: wallet.id },
-              { creditWalletId: wallet.id },
-            ],
-          },
-        },
+            OR: [{ debitWalletId: wallet.id }, { creditWalletId: wallet.id }]
+          }
+        }
       },
       include: {
-        entries: true,
+        entries: true
       },
       orderBy: {
-        createdAt: "desc",
+        createdAt: 'desc'
       },
-      take: input.activityLimit,
+      take: input.activityLimit
     });
 
     return {
       wallet,
-      recentActivity,
+      recentActivity
     };
   }
 
@@ -87,11 +86,11 @@ export class WalletRepository {
     const wallets = await this.prisma.wallet.findMany({
       where: {
         userId,
-        isActive: true,
+        isActive: true
       },
       select: {
-        id: true,
-      },
+        id: true
+      }
     });
 
     const walletIds = wallets.map((wallet) => wallet.id);
@@ -99,37 +98,34 @@ export class WalletRepository {
     const where: Prisma.LedgerTransactionWhereInput = {
       ...(input.currency
         ? {
-            currency: input.currency as WalletCurrency,
+            currency: input.currency as WalletCurrency
           }
         : {}),
       entries: {
         some: {
-          OR: [
-            { debitWalletId: { in: walletIds } },
-            { creditWalletId: { in: walletIds } },
-          ],
-        },
-      },
+          OR: [{ debitWalletId: { in: walletIds } }, { creditWalletId: { in: walletIds } }]
+        }
+      }
     };
 
     const [items, total] = await this.prisma.$transaction([
       this.prisma.ledgerTransaction.findMany({
         where,
         include: {
-          entries: true,
+          entries: true
         },
         orderBy: {
-          createdAt: "desc",
+          createdAt: 'desc'
         },
         skip: (input.page - 1) * input.limit,
-        take: input.limit,
+        take: input.limit
       }),
-      this.prisma.ledgerTransaction.count({ where }),
+      this.prisma.ledgerTransaction.count({ where })
     ]);
 
     return {
       items,
-      total,
+      total
     };
   }
 
@@ -139,7 +135,7 @@ export class WalletRepository {
     return this.prisma.$transaction(async (transaction) => {
       const senderWallet = await this.getWalletForTransaction(transaction, {
         userId: senderUserId,
-        currency: input.currency as WalletCurrency,
+        currency: input.currency as WalletCurrency
       });
 
       const receiverWallet = await transaction.wallet.findFirst({
@@ -149,16 +145,16 @@ export class WalletRepository {
           isActive: true,
           user: {
             finxTag: input.finxTag,
-            deletedAt: null,
-          },
+            deletedAt: null
+          }
         },
         include: {
-          user: true,
-        },
+          user: true
+        }
       });
 
       if (!receiverWallet) {
-        throw AppError.notFound("Receiver wallet not found.");
+        throw AppError.notFound('Receiver wallet not found.');
       }
 
       const debitResult = await transaction.wallet.updateMany({
@@ -166,46 +162,46 @@ export class WalletRepository {
           id: senderWallet.id,
           isActive: true,
           availableBalance: {
-            gte: amount,
-          },
+            gte: amount
+          }
         },
         data: {
           availableBalance: {
-            decrement: amount,
+            decrement: amount
           },
           ledgerVersion: {
-            increment: 1,
-          },
-        },
+            increment: 1
+          }
+        }
       });
 
       if (debitResult.count !== 1) {
-        throw new AppError("Insufficient funds.", 409, {
-          code: "INSUFFICIENT_FUNDS",
+        throw new AppError('Insufficient funds.', 409, {
+          code: 'INSUFFICIENT_FUNDS'
         });
       }
 
       await transaction.wallet.update({
         where: {
-          id: receiverWallet.id,
+          id: receiverWallet.id
         },
         data: {
           availableBalance: {
-            increment: amount,
+            increment: amount
           },
           ledgerVersion: {
-            increment: 1,
-          },
-        },
+            increment: 1
+          }
+        }
       });
 
       const [updatedSenderWallet, updatedReceiverWallet] = await Promise.all([
         transaction.wallet.findUniqueOrThrow({
-          where: { id: senderWallet.id },
+          where: { id: senderWallet.id }
         }),
         transaction.wallet.findUniqueOrThrow({
-          where: { id: receiverWallet.id },
-        }),
+          where: { id: receiverWallet.id }
+        })
       ]);
 
       const ledgerTransaction = await transaction.ledgerTransaction.create({
@@ -226,7 +222,7 @@ export class WalletRepository {
                 debitWalletId: senderWallet.id,
                 amount,
                 runningBalanceSnapshot: updatedSenderWallet.availableBalance,
-                narration: input.narration ?? `Debit for transfer to @${input.finxTag}`,
+                narration: input.narration ?? `Debit for transfer to @${input.finxTag}`
               },
               {
                 direction: LedgerEntryDirection.CREDIT,
@@ -234,37 +230,374 @@ export class WalletRepository {
                 creditWalletId: receiverWallet.id,
                 amount,
                 runningBalanceSnapshot: updatedReceiverWallet.availableBalance,
-                narration: input.narration ?? `Credit from @${senderWallet.userId}`,
-              },
-            ],
-          },
+                narration: input.narration ?? `Credit from @${senderWallet.userId}`
+              }
+            ]
+          }
         },
         include: {
-          entries: true,
-        },
+          entries: true
+        }
       });
 
       return {
         senderWallet: updatedSenderWallet,
         receiverWallet: updatedReceiverWallet,
         ledgerTransaction,
-        receiverUser: receiverWallet.user,
+        receiverUser: receiverWallet.user
       };
     });
   }
 
-  public async recordFiatWithdrawal(
-    userId: string,
-    input: WithdrawInput,
-    reference: string,
-    providerName: string,
-  ) {
+  public async createFiatDepositIntent(input: {
+    userId: string;
+    walletId: string;
+    email: string;
+    body: DepositInput;
+    reference: string;
+    idempotencyKey?: string | undefined;
+  }) {
+    return this.prisma.$transaction(async (transaction) => {
+      if (input.idempotencyKey) {
+        const existingIntent = await transaction.paymentIntent.findUnique({
+          where: {
+            idempotencyKey: input.idempotencyKey
+          }
+        });
+
+        if (existingIntent) {
+          return {
+            paymentIntent: existingIntent,
+            reused: true
+          };
+        }
+      }
+
+      const paymentIntent = await transaction.paymentIntent.create({
+        data: {
+          userId: input.userId,
+          walletId: input.walletId,
+          provider: PaymentProvider.PAYSTACK,
+          direction: PaymentDirection.INBOUND,
+          type: PaymentType.FIAT_DEPOSIT,
+          status: PaymentStatus.INITIATED,
+          reference: input.reference,
+          idempotencyKey: input.idempotencyKey ?? null,
+          amount: new Prisma.Decimal(input.body.amount),
+          currency: input.body.currency as WalletCurrency,
+          email: input.email,
+          callbackUrl: input.body.callbackUrl ?? null,
+          metadata: {
+            userId: input.userId,
+            walletId: input.walletId
+          },
+          events: {
+            create: {
+              eventType: PaymentEventType.CREATED,
+              toStatus: PaymentStatus.INITIATED,
+              idempotencyKey: input.idempotencyKey ?? null
+            }
+          }
+        }
+      });
+
+      return {
+        paymentIntent,
+        reused: false
+      };
+    });
+  }
+
+  public async markDepositInitialized(paymentIntentId: string, providerResult: InitiateDepositResult) {
+    return this.prisma.$transaction(async (transaction) => {
+      const paymentIntent = await transaction.paymentIntent.findUniqueOrThrow({
+        where: {
+          id: paymentIntentId
+        }
+      });
+
+      assertPaymentTransition(paymentIntent.status, PaymentStatus.AWAITING_CUSTOMER);
+
+      const updatedPaymentIntent = await transaction.paymentIntent.update({
+        where: {
+          id: paymentIntent.id
+        },
+        data: {
+          status: PaymentStatus.AWAITING_CUSTOMER,
+          providerReference: providerResult.reference,
+          authorizationUrl: providerResult.authorizationUrl,
+          accessCode: providerResult.accessCode,
+          version: {
+            increment: 1
+          },
+          events: {
+            create: [
+              {
+                eventType: PaymentEventType.PROVIDER_INITIALIZED,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.AWAITING_CUSTOMER,
+                providerReference: providerResult.reference,
+                payload: this.toJson(providerResult)
+              },
+              {
+                eventType: PaymentEventType.STATE_TRANSITION,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.AWAITING_CUSTOMER
+              }
+            ]
+          }
+        }
+      });
+
+      return updatedPaymentIntent;
+    });
+  }
+
+  public async markPaymentFailed(reference: string, reason: string, payload?: unknown) {
+    return this.prisma.$transaction(async (transaction) => {
+      const paymentIntent = await transaction.paymentIntent.findUnique({
+        where: {
+          reference
+        }
+      });
+
+      if (!paymentIntent || paymentIntent.status === PaymentStatus.FAILED) {
+        return paymentIntent;
+      }
+
+      assertPaymentTransition(paymentIntent.status, PaymentStatus.FAILED);
+
+      return transaction.paymentIntent.update({
+        where: {
+          id: paymentIntent.id
+        },
+        data: {
+          status: PaymentStatus.FAILED,
+          failedAt: new Date(),
+          failureReason: reason,
+          providerPayload: payload === undefined ? Prisma.JsonNull : this.toJson(payload),
+          version: {
+            increment: 1
+          },
+          events: {
+            create: [
+              {
+                eventType: PaymentEventType.PROVIDER_FAILED,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.FAILED,
+                payload: payload === undefined ? Prisma.JsonNull : this.toJson(payload)
+              },
+              {
+                eventType: PaymentEventType.STATE_TRANSITION,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.FAILED
+              }
+            ]
+          }
+        }
+      });
+    });
+  }
+
+  public async findPaymentIntentForUser(userId: string, reference: string) {
+    return this.prisma.paymentIntent.findFirst({
+      where: {
+        userId,
+        reference
+      },
+      include: {
+        ledgerTransaction: true
+      }
+    });
+  }
+
+  public async findPaymentIntentByReference(reference: string) {
+    return this.prisma.paymentIntent.findFirst({
+      where: {
+        OR: [{ reference }, { providerReference: reference }]
+      }
+    });
+  }
+
+  public async recordPaymentWebhook(input: { reference: string; eventName: string; payload: unknown }) {
+    const paymentIntent = await this.findPaymentIntentByReference(input.reference);
+
+    if (!paymentIntent) {
+      return null;
+    }
+
+    await this.prisma.paymentEvent.create({
+      data: {
+        paymentIntentId: paymentIntent.id,
+        eventType: PaymentEventType.WEBHOOK_RECEIVED,
+        providerReference: paymentIntent.reference,
+        payload: this.toJson({
+          event: input.eventName,
+          data: input.payload
+        })
+      }
+    });
+
+    return paymentIntent;
+  }
+
+  public async postSuccessfulFiatDeposit(reference: string, verification: VerifyTransactionResult) {
+    return this.prisma.$transaction(async (transaction) => {
+      const paymentIntent = await this.lockPaymentIntent(transaction, reference);
+
+      if (!paymentIntent) {
+        throw AppError.notFound('Payment intent not found.');
+      }
+
+      if (paymentIntent.status === PaymentStatus.SUCCEEDED) {
+        const existingPaymentIntent = await transaction.paymentIntent.findUniqueOrThrow({
+          where: {
+            id: paymentIntent.id
+          },
+          include: {
+            ledgerTransaction: true
+          }
+        });
+        const existingWallet = await transaction.wallet.findUniqueOrThrow({
+          where: {
+            id: paymentIntent.walletId
+          }
+        });
+
+        return {
+          paymentIntent: existingPaymentIntent,
+          wallet: existingWallet,
+          ledgerTransaction: existingPaymentIntent.ledgerTransaction
+        };
+      }
+
+      assertPaymentTransition(paymentIntent.status, PaymentStatus.SUCCEEDED);
+      this.assertProviderAmountMatches(paymentIntent.amount, verification.amount);
+
+      await this.lockWallet(transaction, paymentIntent.walletId);
+
+      const creditResult = await transaction.wallet.updateMany({
+        where: {
+          id: paymentIntent.walletId,
+          isActive: true
+        },
+        data: {
+          availableBalance: {
+            increment: paymentIntent.amount
+          },
+          ledgerVersion: {
+            increment: 1
+          }
+        }
+      });
+
+      if (creditResult.count !== 1) {
+        throw AppError.notFound('Wallet not found.');
+      }
+
+      const updatedWallet = await transaction.wallet.findUniqueOrThrow({
+        where: {
+          id: paymentIntent.walletId
+        }
+      });
+
+      const ledgerTransaction = await transaction.ledgerTransaction.create({
+        data: {
+          externalReference: paymentIntent.reference,
+          idempotencyKey: paymentIntent.idempotencyKey,
+          type: LedgerTransactionType.DEPOSIT,
+          status: LedgerTransactionStatus.POSTED,
+          description: `Paystack deposit ${paymentIntent.reference}`,
+          currency: paymentIntent.currency,
+          amount: paymentIntent.amount,
+          initiatedByUserId: paymentIntent.userId,
+          postedAt: new Date(),
+          metadata: this.toJson({
+            provider: 'paystack',
+            providerTransactionId: verification.providerTransactionId?.toString(),
+            gatewayResponse: verification.gatewayResponse,
+            channel: verification.channel
+          }),
+          entries: {
+            create: [
+              {
+                direction: LedgerEntryDirection.DEBIT,
+                accountType: LedgerAccountType.ASSET,
+                amount: paymentIntent.amount,
+                narration: `Paystack settlement receivable for ${paymentIntent.reference}`
+              },
+              {
+                direction: LedgerEntryDirection.CREDIT,
+                accountType: LedgerAccountType.LIABILITY,
+                creditWalletId: paymentIntent.walletId,
+                amount: paymentIntent.amount,
+                runningBalanceSnapshot: updatedWallet.availableBalance,
+                narration: `Wallet deposit from Paystack`
+              }
+            ]
+          }
+        }
+      });
+
+      const updatedPaymentIntent = await transaction.paymentIntent.update({
+        where: {
+          id: paymentIntent.id
+        },
+        data: {
+          status: PaymentStatus.SUCCEEDED,
+          ledgerTransactionId: ledgerTransaction.id,
+          providerTransactionId: verification.providerTransactionId ?? null,
+          providerStatus: verification.status,
+          gatewayResponse: verification.gatewayResponse ?? null,
+          fees: verification.fees ? new Prisma.Decimal(verification.fees) : null,
+          paidAt: verification.paidAt ?? null,
+          processedAt: new Date(),
+          providerPayload: this.toJson(verification.raw),
+          version: {
+            increment: 1
+          },
+          events: {
+            create: [
+              {
+                eventType: PaymentEventType.PROVIDER_VERIFIED,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.SUCCEEDED,
+                providerReference: verification.reference,
+                payload: this.toJson(verification.raw)
+              },
+              {
+                eventType: PaymentEventType.LEDGER_POSTED,
+                toStatus: PaymentStatus.SUCCEEDED,
+                providerReference: verification.reference,
+                payload: {
+                  ledgerTransactionId: ledgerTransaction.id
+                }
+              },
+              {
+                eventType: PaymentEventType.STATE_TRANSITION,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.SUCCEEDED
+              }
+            ]
+          }
+        }
+      });
+
+      return {
+        paymentIntent: updatedPaymentIntent,
+        wallet: updatedWallet,
+        ledgerTransaction
+      };
+    });
+  }
+
+  public async recordFiatWithdrawal(userId: string, input: WithdrawInput, reference: string, providerName: string) {
     const amount = new Prisma.Decimal(input.amount);
 
     return this.prisma.$transaction(async (transaction) => {
       const wallet = await this.getWalletForTransaction(transaction, {
         userId,
-        currency: input.currency as WalletCurrency,
+        currency: input.currency as WalletCurrency
       });
 
       const debitResult = await transaction.wallet.updateMany({
@@ -272,29 +605,29 @@ export class WalletRepository {
           id: wallet.id,
           isActive: true,
           availableBalance: {
-            gte: amount,
-          },
+            gte: amount
+          }
         },
         data: {
           availableBalance: {
-            decrement: amount,
+            decrement: amount
           },
           ledgerVersion: {
-            increment: 1,
-          },
-        },
+            increment: 1
+          }
+        }
       });
 
       if (debitResult.count !== 1) {
-        throw new AppError("Insufficient funds.", 409, {
-          code: "INSUFFICIENT_FUNDS",
+        throw new AppError('Insufficient funds.', 409, {
+          code: 'INSUFFICIENT_FUNDS'
         });
       }
 
       const updatedWallet = await transaction.wallet.findUniqueOrThrow({
         where: {
-          id: wallet.id,
-        },
+          id: wallet.id
+        }
       });
 
       const ledgerTransaction = await transaction.ledgerTransaction.create({
@@ -311,7 +644,7 @@ export class WalletRepository {
             provider: providerName,
             bankCode: input.bankCode,
             accountNumber: input.accountNumber,
-            accountName: input.accountName,
+            accountName: input.accountName
           },
           entries: {
             create: [
@@ -321,19 +654,393 @@ export class WalletRepository {
                 debitWalletId: wallet.id,
                 amount,
                 runningBalanceSnapshot: updatedWallet.availableBalance,
-                narration: input.narration ?? `Withdrawal to ${input.accountNumber}`,
-              },
-            ],
-          },
+                narration: input.narration ?? `Withdrawal to ${input.accountNumber}`
+              }
+            ]
+          }
         },
         include: {
-          entries: true,
-        },
+          entries: true
+        }
       });
 
       return {
         wallet: updatedWallet,
-        ledgerTransaction,
+        ledgerTransaction
+      };
+    });
+  }
+
+  public async reserveFiatWithdrawal(input: { userId: string; body: WithdrawInput; reference: string; idempotencyKey?: string | undefined }) {
+    const amount = new Prisma.Decimal(input.body.amount);
+
+    return this.prisma.$transaction(async (transaction) => {
+      if (input.idempotencyKey) {
+        const existingIntent = await transaction.paymentIntent.findUnique({
+          where: {
+            idempotencyKey: input.idempotencyKey
+          },
+          include: {
+            wallet: true
+          }
+        });
+
+        if (existingIntent) {
+          return {
+            paymentIntent: existingIntent,
+            wallet: existingIntent.wallet,
+            reused: true
+          };
+        }
+      }
+
+      const wallet = await this.getWalletForTransaction(transaction, {
+        userId: input.userId,
+        currency: input.body.currency as WalletCurrency
+      });
+
+      await this.lockWallet(transaction, wallet.id);
+
+      const reserveResult = await transaction.wallet.updateMany({
+        where: {
+          id: wallet.id,
+          isActive: true,
+          availableBalance: {
+            gte: amount
+          }
+        },
+        data: {
+          availableBalance: {
+            decrement: amount
+          },
+          reservedBalance: {
+            increment: amount
+          },
+          ledgerVersion: {
+            increment: 1
+          }
+        }
+      });
+
+      if (reserveResult.count !== 1) {
+        throw new AppError('Insufficient funds.', 409, {
+          code: 'INSUFFICIENT_FUNDS'
+        });
+      }
+
+      const updatedWallet = await transaction.wallet.findUniqueOrThrow({
+        where: {
+          id: wallet.id
+        }
+      });
+
+      const paymentIntent = await transaction.paymentIntent.create({
+        data: {
+          userId: input.userId,
+          walletId: wallet.id,
+          provider: PaymentProvider.PAYSTACK,
+          direction: PaymentDirection.OUTBOUND,
+          type: PaymentType.FIAT_WITHDRAWAL,
+          status: PaymentStatus.PROCESSING,
+          reference: input.reference,
+          idempotencyKey: input.idempotencyKey ?? null,
+          amount,
+          currency: input.body.currency as WalletCurrency,
+          metadata: this.toJson({
+            bankCode: input.body.bankCode,
+            accountNumber: input.body.accountNumber,
+            accountName: input.body.accountName,
+            narration: input.body.narration
+          }),
+          events: {
+            create: [
+              {
+                eventType: PaymentEventType.CREATED,
+                toStatus: PaymentStatus.PROCESSING,
+                idempotencyKey: input.idempotencyKey ?? null
+              },
+              {
+                eventType: PaymentEventType.STATE_TRANSITION,
+                fromStatus: PaymentStatus.INITIATED,
+                toStatus: PaymentStatus.PROCESSING
+              }
+            ]
+          }
+        }
+      });
+
+      return {
+        paymentIntent,
+        wallet: updatedWallet,
+        reused: false
+      };
+    });
+  }
+
+  public async attachWithdrawalProviderResult(reference: string, providerResult: TransferToBankResult) {
+    return this.prisma.$transaction(async (transaction) => {
+      const paymentIntent = await this.lockPaymentIntent(transaction, reference);
+
+      if (!paymentIntent) {
+        throw AppError.notFound('Payment intent not found.');
+      }
+
+      const updated = await transaction.paymentIntent.update({
+        where: {
+          id: paymentIntent.id
+        },
+        data: {
+          providerReference: providerResult.transferCode ?? providerResult.reference,
+          recipientCode: providerResult.recipientCode ?? null,
+          providerTransactionId: providerResult.providerTransferId ?? null,
+          providerStatus: providerResult.status,
+          gatewayResponse: providerResult.gatewayResponse ?? null,
+          providerPayload: this.toJson(providerResult.raw),
+          version: {
+            increment: 1
+          },
+          events: {
+            create: {
+              eventType: PaymentEventType.PROVIDER_TRANSFER_CREATED,
+              fromStatus: paymentIntent.status,
+              toStatus: paymentIntent.status,
+              providerReference: providerResult.reference,
+              payload: this.toJson(providerResult.raw)
+            }
+          }
+        }
+      });
+
+      return updated;
+    });
+  }
+
+  public async settleSuccessfulFiatWithdrawal(reference: string, payload?: unknown) {
+    return this.prisma.$transaction(async (transaction) => {
+      const paymentIntent = await this.lockPaymentIntent(transaction, reference);
+
+      if (!paymentIntent) {
+        throw AppError.notFound('Payment intent not found.');
+      }
+
+      if (paymentIntent.status === PaymentStatus.SUCCEEDED) {
+        const existingPaymentIntent = await transaction.paymentIntent.findUniqueOrThrow({
+          where: {
+            id: paymentIntent.id
+          },
+          include: {
+            ledgerTransaction: true
+          }
+        });
+        const existingWallet = await transaction.wallet.findUniqueOrThrow({
+          where: {
+            id: paymentIntent.walletId
+          }
+        });
+
+        return {
+          paymentIntent: existingPaymentIntent,
+          wallet: existingWallet,
+          ledgerTransaction: existingPaymentIntent.ledgerTransaction
+        };
+      }
+
+      assertPaymentTransition(paymentIntent.status, PaymentStatus.SUCCEEDED);
+      await this.lockWallet(transaction, paymentIntent.walletId);
+
+      const settleResult = await transaction.wallet.updateMany({
+        where: {
+          id: paymentIntent.walletId,
+          reservedBalance: {
+            gte: paymentIntent.amount
+          }
+        },
+        data: {
+          reservedBalance: {
+            decrement: paymentIntent.amount
+          },
+          ledgerVersion: {
+            increment: 1
+          }
+        }
+      });
+
+      if (settleResult.count !== 1) {
+        throw new AppError('Reserved funds are not available for settlement.', 409, {
+          code: 'RESERVED_FUNDS_NOT_AVAILABLE'
+        });
+      }
+
+      const updatedWallet = await transaction.wallet.findUniqueOrThrow({
+        where: {
+          id: paymentIntent.walletId
+        }
+      });
+
+      const ledgerTransaction = await transaction.ledgerTransaction.create({
+        data: {
+          externalReference: paymentIntent.reference,
+          idempotencyKey: paymentIntent.idempotencyKey,
+          type: LedgerTransactionType.WITHDRAWAL,
+          status: LedgerTransactionStatus.POSTED,
+          description: `Paystack withdrawal ${paymentIntent.reference}`,
+          currency: paymentIntent.currency,
+          amount: paymentIntent.amount,
+          initiatedByUserId: paymentIntent.userId,
+          postedAt: new Date(),
+          metadata: this.toJson({
+            provider: 'paystack',
+            providerReference: paymentIntent.providerReference,
+            bank: paymentIntent.metadata
+          }),
+          entries: {
+            create: [
+              {
+                direction: LedgerEntryDirection.DEBIT,
+                accountType: LedgerAccountType.LIABILITY,
+                debitWalletId: paymentIntent.walletId,
+                amount: paymentIntent.amount,
+                runningBalanceSnapshot: updatedWallet.availableBalance,
+                narration: `Wallet withdrawal via Paystack`
+              },
+              {
+                direction: LedgerEntryDirection.CREDIT,
+                accountType: LedgerAccountType.ASSET,
+                amount: paymentIntent.amount,
+                narration: `Paystack payout for ${paymentIntent.reference}`
+              }
+            ]
+          }
+        }
+      });
+
+      const updatedPaymentIntent = await transaction.paymentIntent.update({
+        where: {
+          id: paymentIntent.id
+        },
+        data: {
+          status: PaymentStatus.SUCCEEDED,
+          ledgerTransactionId: ledgerTransaction.id,
+          processedAt: new Date(),
+          providerPayload: payload === undefined ? Prisma.JsonNull : this.toJson(payload),
+          version: {
+            increment: 1
+          },
+          events: {
+            create: [
+              {
+                eventType: PaymentEventType.LEDGER_POSTED,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.SUCCEEDED,
+                providerReference: paymentIntent.providerReference,
+                payload: {
+                  ledgerTransactionId: ledgerTransaction.id
+                }
+              },
+              {
+                eventType: PaymentEventType.STATE_TRANSITION,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.SUCCEEDED
+              }
+            ]
+          }
+        }
+      });
+
+      return {
+        paymentIntent: updatedPaymentIntent,
+        wallet: updatedWallet,
+        ledgerTransaction
+      };
+    });
+  }
+
+  public async releaseFailedFiatWithdrawal(reference: string, reason: string, payload?: unknown) {
+    return this.prisma.$transaction(async (transaction) => {
+      const paymentIntent = await this.lockPaymentIntent(transaction, reference);
+
+      if (!paymentIntent) {
+        throw AppError.notFound('Payment intent not found.');
+      }
+
+      if (paymentIntent.status === PaymentStatus.FAILED) {
+        const existingPaymentIntent = await transaction.paymentIntent.findUniqueOrThrow({
+          where: {
+            id: paymentIntent.id
+          }
+        });
+        const existingWallet = await transaction.wallet.findUniqueOrThrow({
+          where: {
+            id: paymentIntent.walletId
+          }
+        });
+
+        return {
+          paymentIntent: existingPaymentIntent,
+          wallet: existingWallet
+        };
+      }
+
+      assertPaymentTransition(paymentIntent.status, PaymentStatus.FAILED);
+      await this.lockWallet(transaction, paymentIntent.walletId);
+
+      await transaction.wallet.update({
+        where: {
+          id: paymentIntent.walletId
+        },
+        data: {
+          availableBalance: {
+            increment: paymentIntent.amount
+          },
+          reservedBalance: {
+            decrement: paymentIntent.amount
+          },
+          ledgerVersion: {
+            increment: 1
+          }
+        }
+      });
+
+      const updatedPaymentIntent = await transaction.paymentIntent.update({
+        where: {
+          id: paymentIntent.id
+        },
+        data: {
+          status: PaymentStatus.FAILED,
+          failedAt: new Date(),
+          failureReason: reason,
+          providerPayload: payload === undefined ? Prisma.JsonNull : this.toJson(payload),
+          version: {
+            increment: 1
+          },
+          events: {
+            create: [
+              {
+                eventType: PaymentEventType.PROVIDER_FAILED,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.FAILED,
+                providerReference: paymentIntent.providerReference,
+                payload: payload === undefined ? Prisma.JsonNull : this.toJson(payload)
+              },
+              {
+                eventType: PaymentEventType.STATE_TRANSITION,
+                fromStatus: paymentIntent.status,
+                toStatus: PaymentStatus.FAILED
+              }
+            ]
+          }
+        }
+      });
+
+      const updatedWallet = await transaction.wallet.findUniqueOrThrow({
+        where: {
+          id: paymentIntent.walletId
+        }
+      });
+
+      return {
+        paymentIntent: updatedPaymentIntent,
+        wallet: updatedWallet
       };
     });
   }
@@ -343,21 +1050,57 @@ export class WalletRepository {
     options: {
       userId: string;
       currency: WalletCurrency;
-    },
+    }
   ) {
     const wallet = await transaction.wallet.findFirst({
       where: {
         userId: options.userId,
         currency: options.currency,
         type: WalletType.FIAT,
-        isActive: true,
-      },
+        isActive: true
+      }
     });
 
     if (!wallet) {
-      throw AppError.notFound("Wallet not found.");
+      throw AppError.notFound('Wallet not found.');
     }
 
     return wallet;
+  }
+
+  private async lockPaymentIntent(transaction: TransactionClient, reference: string) {
+    await transaction.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "PaymentIntent" WHERE reference = ${reference} FOR UPDATE
+    `;
+
+    return transaction.paymentIntent.findUnique({
+      where: {
+        reference
+      }
+    });
+  }
+
+  private async lockWallet(transaction: TransactionClient, walletId: string): Promise<void> {
+    await transaction.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Wallet" WHERE id = ${walletId} FOR UPDATE
+    `;
+  }
+
+  private assertProviderAmountMatches(expectedAmount: Prisma.Decimal, providerAmount: string): void {
+    if (!expectedAmount.equals(new Prisma.Decimal(providerAmount))) {
+      throw new AppError('Verified payment amount does not match the payment intent.', 409, {
+        code: 'PAYMENT_AMOUNT_MISMATCH',
+        details: {
+          expected: expectedAmount.toString(),
+          actual: providerAmount
+        }
+      });
+    }
+  }
+
+  private toJson(value: unknown): Prisma.InputJsonValue {
+    return JSON.parse(
+      JSON.stringify(value, (_key, nestedValue: unknown) => (typeof nestedValue === 'bigint' ? nestedValue.toString() : nestedValue))
+    ) as Prisma.InputJsonValue;
   }
 }

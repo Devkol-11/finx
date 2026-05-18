@@ -2,14 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { env } from "../config/env";
 
-/**
- * Centralized Prisma client so the entire process shares one connection manager.
- *
- * The global cache prevents duplicate clients during local hot reloads while
- * preserving a single clean instance in production.
- */
 declare global {
-  // eslint-disable-next-line no-var
   var __finxPrisma__: PrismaClient | undefined;
 }
 
