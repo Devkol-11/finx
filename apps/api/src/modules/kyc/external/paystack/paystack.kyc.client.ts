@@ -172,7 +172,7 @@ export class PaystackKycVerificator implements KycProvider {
         throw error;
       }
       // UNKNOWN ERRORS
-      -console.error('[PAYSTACK_KYC_UNKNOWN_ERROR]', error);
+      console.error('[PAYSTACK_KYC_UNKNOWN_ERROR]', error);
       throw AppError.internal('Unexpected verification error occurred');
     }
   }

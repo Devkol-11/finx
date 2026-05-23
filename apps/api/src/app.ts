@@ -9,14 +9,17 @@ import { getRedisApi } from './lib/redis';
 import { prisma } from './lib/prisma';
 import { pingRedis } from './lib/redis';
 import { authRoutes } from './modules/auth/http/auth.routes';
+import { walletRoutes } from './modules/wallet/http/wallet.routes';
+import { walletMockRoutes } from './modules/wallet-mock/http/wallet-mock.routes';
+import { savingsRoute } from './modules/savings/http/savings.routes';
 import { recordHttpError, recordHttpRequest, renderPrometheusMetrics } from './modules/observability/metrics';
 import { paymentRoutes } from './modules/payments/http/payment.routes';
-import { walletRoutes } from './modules/wallet/http/wallet.routes';
 import { authPlugin } from './plugins/auth';
 import { errorPlugin } from './plugins/errorPlugin';
 import { webhookRoutes } from './modules/webhooks/http/webhook.route';
 import { mapJwtError } from './plugins/auth';
 import { AppError } from './utils/ErrorHandler';
+import { kycRoutes } from './modules/kyc/http/kyc.routes';
 
 const requestStarts = new WeakMap<FastifyRequest, bigint>();
 
@@ -285,12 +288,20 @@ export const buildApp = async () => {
     prefix: '/api/v1/auth'
   });
 
-  await app.register(walletRoutes, {
+  await app.register(walletMockRoutes, {
     prefix: '/api/v1/wallet'
+  });
+
+  await app.register(kycRoutes, {
+    prefix: '/api/v1/kyc'
   });
 
   await app.register(paymentRoutes, {
     prefix: '/api/v1/payments'
+  });
+
+  await app.register(savingsRoute, {
+    prefix: '/api/v1/savings'
   });
 
   await app.register(webhookRoutes, {

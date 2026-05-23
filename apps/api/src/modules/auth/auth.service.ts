@@ -11,6 +11,7 @@ import { mapJwtError } from '../../plugins/auth';
 import { AuthRepository } from './auth.repository';
 import type { ForgotInput, LoginInput, RegisterInput, ResetInput } from './http/auth.schema';
 import logger from '../../utils/logger';
+import { mockVerifyPhoneNumber } from './auth.helpers';
 
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = 15;
 const MAX_FINX_TAG_GENERATION_ATTEMPTS = 10;
@@ -32,10 +33,22 @@ export class AuthService {
       email: input.email,
       attempt: 0
     });
-    const existingUser = await this.authRepository.findUserByEmail(input.email);
+    const existsByEmail = await this.authRepository.findUserByEmail(input.email);
 
-    if (existingUser) {
+    if (existsByEmail) {
       throw AppError.conflict('An account already exists with this email address.');
+    }
+
+    const existsByPhoneNumber = await this.authRepository.existsByPhoneNumber(input.phoneNumber);
+
+    if (existsByPhoneNumber) {
+      throw AppError.conflict('An account already exists with this Phone Number.');
+    }
+
+    const phoneNumberVerificationResult = mockVerifyPhoneNumber(input.phoneNumber);
+
+    if (!phoneNumberVerificationResult.verified) {
+      throw AppError.badRequest(phoneNumberVerificationResult.reason ?? 'Invalid phone number');
     }
 
     const passwordHash = await argon2.hash(input.password, {

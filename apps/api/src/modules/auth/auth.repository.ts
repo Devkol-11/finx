@@ -85,6 +85,16 @@ export class AuthRepository {
     return Boolean(existingUser);
   }
 
+  public async existsByPhoneNumber(phoneNumber: string) {
+    const exists = await this.prisma.user.findFirst({
+      where: {
+        phoneNumber
+      }
+    });
+
+    return Boolean(exists);
+  }
+
   public async registerUserWithWallet(input: RegisterInput, passwordHash: string, finxTag: string) {
     logger.info('[AUTH] creating user + wallet', {
       email: input.email,
@@ -97,6 +107,8 @@ export class AuthRepository {
           phoneNumber: input.phoneNumber,
           firstName: input.firstName.trim(),
           lastName: input.lastName.trim(),
+          isPhoneVerified: true,
+          isEmailVerified: true,
           passwordHash,
           finxTag,
           status: UserStatus.ACTIVE

@@ -110,6 +110,7 @@ enum KycVerificationStatus {
 
 enum PaymentProvider {
   PAYSTACK
+  MOCK
 }
 
 enum PaymentDirection {
@@ -157,6 +158,24 @@ enum WebhookEventStatus {
   FAILED
 }
 
+enum SavingsType {
+  FLEXIBLE
+  LOCKED
+  TARGET
+}
+
+enum SavingsTransactionType {
+  DEPOSIT
+  WITHDRAWAL
+}
+
+enum SavingsStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  WITHDRAWN
+}
+
 model User {
   id              String     @id @default(uuid())
   email           String     @unique @db.VarChar(320)
@@ -173,10 +192,10 @@ model User {
   updatedAt       DateTime   @updatedAt
   deletedAt       DateTime?
 
+  savings             SavingsPlan[]
   wallets             Wallet[]
   virtualAccounts     VirtualAccount[]
   initiatedTransfers  LedgerTransaction[]  @relation("TransactionInitiator")
-  investmentPlans     InvestmentPlan[]
   passwordResetTokens PasswordResetToken[]
   sessions            Session[]
   kycProfile          KycProfile?
@@ -239,11 +258,11 @@ model Wallet {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
-  user            User             @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  debitEntries    LedgerEntry[]    @relation("DebitWalletEntries")
-  creditEntries   LedgerEntry[]    @relation("CreditWalletEntries")
-  investmentPlans InvestmentPlan[]
-  paymentIntents  PaymentIntent[]
+  user           User            @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  savings        SavingsPlan[]
+  debitEntries   LedgerEntry[]   @relation("DebitWalletEntries")
+  creditEntries  LedgerEntry[]   @relation("CreditWalletEntries")
+  paymentIntents PaymentIntent[]
 
   @@unique([userId, currency, type], map: "wallet_user_currency_type_unique")
   @@index([userId])
@@ -270,7 +289,6 @@ model VirtualAccount {
   status VirtualAccountStatus @default(PENDING)
 
   failureReason String?
-
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -309,6 +327,29 @@ model LedgerTransaction {
   @@index([type, createdAt])
   @@index([initiatedByUserId])
   @@index([currency, createdAt])
+}
+
+model LedgerEntry {
+  id                     String               @id @default(uuid())
+  transactionId          String
+  direction              LedgerEntryDirection
+  accountType            LedgerAccountType
+  debitWalletId          String?
+  creditWalletId         String?
+  amount                 Decimal              @db.Decimal(30, 8)
+  runningBalanceSnapshot Decimal?             @db.Decimal(30, 8)
+  narration              String?              @db.VarChar(255)
+  metadata               Json?
+  createdAt              DateTime             @default(now())
+
+  transaction  LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  debitWallet  Wallet?           @relation("DebitWalletEntries", fields: [debitWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  creditWallet Wallet?           @relation("CreditWalletEntries", fields: [creditWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([transactionId])
+  @@index([debitWalletId])
+  @@index([creditWalletId])
+  @@index([direction, createdAt])
 }
 
 model PaymentIntent {
@@ -387,7 +428,7 @@ model WebhookEvent {
 
   payload Json
 
-  status   WebhookEventStatus   
+  status      WebhookEventStatus
   processedAt DateTime?
 
   receivedAt DateTime @default(now())
@@ -398,55 +439,6 @@ model WebhookEvent {
 }
 
 /// Individual debit/credit legs that make a ledger transaction balanced and auditable.
-model LedgerEntry {
-  id                     String               @id @default(uuid())
-  transactionId          String
-  direction              LedgerEntryDirection
-  accountType            LedgerAccountType
-  debitWalletId          String?
-  creditWalletId         String?
-  amount                 Decimal              @db.Decimal(30, 8)
-  runningBalanceSnapshot Decimal?             @db.Decimal(30, 8)
-  narration              String?              @db.VarChar(255)
-  metadata               Json?
-  createdAt              DateTime             @default(now())
-
-  transaction  LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  debitWallet  Wallet?           @relation("DebitWalletEntries", fields: [debitWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  creditWallet Wallet?           @relation("CreditWalletEntries", fields: [creditWalletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-
-  @@index([transactionId])
-  @@index([debitWalletId])
-  @@index([creditWalletId])
-  @@index([direction, createdAt])
-}
-
-model InvestmentPlan {
-  id                   String               @id @default(uuid())
-  userId               String
-  walletId             String
-  type                 InvestmentPlanType
-  status               InvestmentPlanStatus @default(DRAFT)
-  principalAmount      Decimal              @db.Decimal(30, 8)
-  expectedReturnAmount Decimal              @default(0) @db.Decimal(30, 8)
-  interestRate         Decimal              @db.Decimal(10, 6)
-  durationDays         Int?
-  accrualStartAt       DateTime?
-  maturityAt           DateTime?
-  lastAccruedAt        DateTime?
-  cancelledAt          DateTime?
-  metadata             Json?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-
-  @@index([userId, status])
-  @@index([walletId])
-  @@index([type, status])
-  @@index([maturityAt])
-}
 
 model KycProfile {
   id     String @id @default(uuid())
@@ -491,4 +483,54 @@ model KycVerification {
   @@index([userId, type])
   @@index([status, createdAt])
   @@index([kycProfileId])
+}
+
+model SavingsPlan {
+  id String @id @default(uuid())
+
+  userId   String
+  walletId String
+
+  name        String
+  description String?
+
+  type   SavingsType
+  status SavingsStatus
+
+  targetAmount  Decimal? @db.Decimal(30, 8)
+  currentAmount Decimal  @default(0) @db.Decimal(30, 8)
+  cancelReason  String?
+
+  locked     Boolean   @default(false)
+  unlockDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  transactions SavingsTransaction[]
+
+  @@index([userId, id])
+  @@index([walletId])
+  @@unique([userId, id])
+}
+
+model SavingsTransaction {
+  id String @id @default(uuid())
+
+  savingsPlanId String
+
+  type SavingsTransactionType
+
+  amount Decimal @db.Decimal(30, 8)
+
+  reference String @unique
+
+  description String?
+
+  createdAt DateTime @default(now())
+
+  savingsPlan SavingsPlan @relation(fields: [savingsPlanId], references: [id])
 }

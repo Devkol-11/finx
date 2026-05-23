@@ -28,3 +28,34 @@ export interface PaystackChargeSuccessWebhook {
     } | null;
   };
 }
+
+export interface CustomerIdentificationSuccessEvent {
+  event: 'customeridentification.success';
+  data: {
+    customer_id: string;
+    customer_code: string;
+    email: string;
+    identification: {
+      country: string;
+      type: string;
+      value: string;
+    };
+  };
+}
+
+export interface CustomerIdentificationFailedEvent {
+  event: 'customeridentification.failed';
+  data: {
+    customer_id: number;
+    customer_code: string;
+    email: string;
+    identification: {
+      country: string;
+      type: string;
+      bvn: string;
+      account_number: string;
+      bank_code: string;
+    };
+    reason: string;
+  };
+}

@@ -65,6 +65,7 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
     // 1. Handle Known Operational App Errors First
     if (error instanceof AppError) {
       const payload = buildResponse(error.statusCode, error.message, error.code ?? 'APPLICATION_ERROR', error.details);
+      console.log('[ERROR PAYLOAD AFTER BUILD : ', payload);
 
       request.log.warn(
         {
@@ -79,62 +80,10 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
       return;
     }
 
-    // BULLETPROOF ZOD VALIDATION LAYER WITH FAIL-SAFE FALLBACK
+    if ((error as any)?.name === 'ZodError') {
+      const zodError = error as ZodError;
 
-    const errAny = error as any;
-    const isNativeZod =
-      error instanceof ZodError ||
-      errAny?.name === 'ZodError' ||
-      errAny?.name === '$ZodError' ||
-      (Array.isArray(errAny?.issues) && errAny.issues.length > 0);
-
-    let normalizedZodError = error;
-    let isStringifiedZod = false;
-
-    if (!isNativeZod && typeof errAny?.message === 'string' && errAny.message.trim().startsWith('[')) {
-      try {
-        const parsedIssues = JSON.parse(errAny.message);
-        if (Array.isArray(parsedIssues) && parsedIssues.length > 0 && ('code' in parsedIssues[0] || 'origin' in parsedIssues[0])) {
-          isStringifiedZod = true;
-          normalizedZodError = new ZodError(parsedIssues);
-        }
-      } catch {
-        // Fall through safely if parsing fails
-      }
-    }
-
-    if (isNativeZod || isStringifiedZod) {
-      if (!Array.isArray((normalizedZodError as any).issues) && errAny?.issues) {
-        (normalizedZodError as any).issues = errAny.issues;
-      }
-
-      let payload;
-      try {
-        // Attempt to format using your custom utility function
-        payload = formatZodError(normalizedZodError as ZodError);
-      } catch (formatterError) {
-        // FAIL-SAFE: If formatZodError crashes due to Zod v4 structural differences,
-        // we safely catch it and format a clean response manually right here!
-        let rawIssues = (normalizedZodError as any).issues;
-        if (!Array.isArray(rawIssues) && typeof (normalizedZodError as any).message === 'string') {
-          try {
-            rawIssues = JSON.parse((normalizedZodError as any).message);
-          } catch {}
-        }
-
-        payload = {
-          statusCode: 400,
-          error: 'Bad Request',
-          message: 'Validation failed.',
-          code: 'ZOD_VALIDATION_ERROR',
-          details: Array.isArray(rawIssues)
-            ? rawIssues.map((iss: any) => ({
-                field: Array.isArray(iss.path) ? iss.path.join('.') : 'unknown',
-                message: iss.message || 'Invalid input value.'
-              }))
-            : null
-        };
-      }
+      const payload = formatZodError(zodError);
 
       request.log.warn(
         {
@@ -142,16 +91,28 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
           code: payload.code,
           details: payload.details
         },
-        'Zod validation error handled safely.'
+        'Zod validation error handled.'
       );
 
       void reply.status(payload.statusCode).send(payload);
       return;
     }
-    // ==========================================
 
-    // 3. Handle Database / Prisma Failures
+    if ((error as any).name === 'AppError' && (error as any).code === 'UNABLE_TO_PROCESS') {
+      console.log(['ERR : ', error]);
+      const payload = buildResponse((error as any).statusCode, (error as any).message ?? '', (error as any).code);
+      request.log.warn({
+        err: payload.error,
+        code: payload.code,
+        details: payload.code
+      });
+
+      void reply.status(payload.statusCode).send(payload);
+    }
     if (prismaMappedError) {
+      // ==========================================
+
+      // 3. Handle Database / Prisma Failures
       request.log.error(
         {
           err: error,

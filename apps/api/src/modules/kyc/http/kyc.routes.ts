@@ -1,17 +1,21 @@
 import { FastifyPluginAsync } from 'fastify';
-import { submitBvnSchema } from './kyc.schema';
+import { SubmitBvnInput, submitBvnSchema } from './kyc.schema';
 import { validateRequest } from '../../../utils/validateRequest';
+import { KycRepository } from '../kyc.repository';
+import { KycService } from '../kyc.service';
+import { KycController } from './kyc.controllers';
 
 export const kycRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.post(
+  const kycRepo = new KycRepository();
+  const kycService = new KycService(kycRepo);
+  const kycController = new KycController(kycService);
+
+  fastify.post<{ Body: SubmitBvnInput }>(
     '/bvn',
     {
-      schema: {
-        body: submitBvnSchema
-      },
       preHandler: [(request, reply) => fastify.authenticate(request, reply), validateRequest('body', submitBvnSchema)]
     },
-    async (request, reply) => {}
+    kycController.verifyBvn
   );
 
   fastify.get(
@@ -19,6 +23,6 @@ export const kycRoutes: FastifyPluginAsync = async (fastify) => {
     {
       preHandler: [fastify.authenticate]
     },
-    async (request, reply) => {}
+    kycController.getStatus
   );
 };

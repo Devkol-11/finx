@@ -1,5 +1,4 @@
 import type { FastifyPluginAsync } from 'fastify';
-// import { RawBodyRequest } from '../types';
 import { PaystackWebhookInput } from './webhooks.schema';
 import { webHookController } from './webhooks.controllers';
 import type { FastifyRequest } from 'fastify';

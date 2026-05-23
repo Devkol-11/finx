@@ -10,11 +10,7 @@ export const paystackWebhookSchema = z.object({
     'customeridentification.failed'
   ]),
 
-  data: z
-    .object({
-      id: z.union([z.number(), z.string()])
-    })
-    .catchall(z.unknown())
+  data: z.record(z.string(), z.unknown())
 });
 
 export type PaystackWebhookInput = z.infer<typeof paystackWebhookSchema>;

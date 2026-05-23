@@ -15,7 +15,7 @@ export class AppError extends Error {
 
   constructor(
     message: string,
-    statusCode = 500,
+    statusCode: number,
     options?: {
       isOperational?: boolean;
       code?: string;
@@ -83,6 +83,13 @@ export class AppError extends Error {
   public static webHookFailure(message = 'Webhook Delivery Failure', details?: unknown) {
     return new AppError(message, 401, {
       code: 'WEBHOOK_DELIVERY_FAILURE',
+      details
+    });
+  }
+
+  public static validButUnableToProcess(message = 'Unable to process', details?: unknown) {
+    return new AppError(message, 200, {
+      code: 'UNABLE_TO_PROCESS',
       details
     });
   }

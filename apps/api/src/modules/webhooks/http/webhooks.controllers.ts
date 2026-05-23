@@ -1,10 +1,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { PaystackChargeSuccessWebhook, RawBodyRequest } from '../types';
+import { CustomerIdentificationFailedEvent, CustomerIdentificationSuccessEvent, PaystackChargeSuccessWebhook, RawBodyRequest } from '../types';
 import type { FastifyReply } from 'fastify';
 import { env } from '../../../config/env';
 import { AppError } from '../../../utils/ErrorHandler';
-import { queueCapturePayment } from '../../pub-sub';
-import { processIdempotentWebhook } from '../repository/webhook.repository';
+import { queueCapturePayment, queueKycWebhookVerification } from '../../pub-sub';
+import { processIdempodentKycWebhook, processIdempotentChargeWebhook } from '../repository/webhook.repository';
 import { PaymentProvider } from '@prisma/client';
 
 enum PaystackWebhookEvent {
@@ -22,36 +22,58 @@ enum PaystackWebhookEvent {
 export async function webHookController(request: RawBodyRequest, reply: FastifyReply) {
   verifyPaystackSignature(request);
 
-  const eventType = request.body.event;
-  const providerEventId = String(request.body.data?.id);
-  const reference = request.body.data?.reference as string;
-  const payload = request.body.data;
-
-  const result = await processIdempotentWebhook({ providerEventId, payload, eventType });
-
-  if (result.duplicated) {
-    return reply.status(200).send({
-      success: true,
-      deduplicated: true
-    });
-  }
-
   switch (request.body.event) {
     case PaystackWebhookEvent.CHARGE_SUCCESS:
-      const payload = request.body.data as PaystackChargeSuccessWebhook['data'];
+      const chargeSuccessEventType = request.body.event;
+      const chargeSuccessPayload = request.body.data as PaystackChargeSuccessWebhook['data'];
+      const chargeWebhookResult = await processIdempotentChargeWebhook({
+        providerEventId: String(chargeSuccessPayload.id),
+        payload: chargeSuccessPayload,
+        eventType: chargeSuccessEventType
+      });
+
+      if (chargeWebhookResult.duplicated) {
+        return reply.status(200).send({
+          success: true,
+          duplicated: true
+        });
+      }
+
       await queueCapturePayment({
         provider: PaymentProvider.PAYSTACK,
-        eventType,
-        providerEventId,
-        reference,
-        payload
+        eventType: chargeSuccessEventType,
+        providerEventId: String(chargeSuccessPayload.id),
+        reference: chargeSuccessPayload.reference,
+        payload: chargeSuccessPayload
       });
 
       return reply.status(200).send({ success: 'true' });
 
     case PaystackWebhookEvent.CUSTOMER_IDENTIFICATION_SUCCESS:
+      const identificationSuccessEventType = request.body.event;
+      const identificationSuccessPayload = request.body.data as CustomerIdentificationSuccessEvent['data'];
+      const idempodentKycResult = await processIdempodentKycWebhook({
+        customerId: identificationSuccessPayload.customer_id,
+        payload: identificationSuccessPayload,
+        eventType: identificationSuccessEventType
+      });
+
+      if (idempodentKycResult.duplicated) {
+        return reply.status(200).send({
+          success: true,
+          duplicated: true
+        });
+      }
+      await queueKycWebhookVerification({
+        provider: 'PAYSTACK',
+        eventType: identificationSuccessEventType,
+        payload: identificationSuccessPayload
+      });
+
+      return reply.status(200).send({ success: 'true' });
 
     case PaystackWebhookEvent.CUSTOMER_IDENTIFICATION_FAILED:
+      const identificationFailedPayload = request.body.data as unknown as CustomerIdentificationFailedEvent['data'];
       return reply.status(200).send({ success: 'false' });
 
     case PaystackWebhookEvent.TRANSFER_SUCCESS:

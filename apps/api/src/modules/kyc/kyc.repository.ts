@@ -44,4 +44,34 @@ export class KycRepository {
       }
     });
   }
+
+  async completeSuccessfulKycVerification(kycVerificationId: string, kycProfileId: string) {
+    return prisma.$transaction(async (transaction) => {
+      await transaction.kycVerification.update({
+        where: { id: kycVerificationId },
+        data: { status: KycVerificationStatus.APPROVED }
+      });
+
+      await transaction.kycProfile.update({
+        where: { id: kycProfileId },
+        data: {
+          verified: true,
+          status: KycStatus.VERIFIED,
+          lastVerifiedAt: new Date()
+        }
+      });
+    });
+  }
+
+  async getStatus(userId: string) {
+    const profile = await prisma.kycProfile.findUnique({ where: { userId } });
+    if (!profile?.verified) {
+      return {
+        status: false
+      };
+    }
+    return {
+      status: true
+    };
+  }
 }

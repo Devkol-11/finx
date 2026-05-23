@@ -1,8 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { env } from '../config/env';
-import { prisma } from '../lib/prisma';
 import { AppError } from '../utils/ErrorHandler';
-import { getRedisApi } from '../lib/redis';
 
 export const mapJwtError = (
   error: unknown,

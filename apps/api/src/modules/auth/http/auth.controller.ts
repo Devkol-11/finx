@@ -23,7 +23,7 @@ export class AuthController {
     });
     const response = this.attachRefreshCookie(reply, result);
 
-    void reply.status(200).send(response);
+    return reply.status(200).send(response);
   };
 
   public refresh = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -47,7 +47,7 @@ export class AuthController {
       });
       const response = this.attachRefreshCookie(reply, result);
 
-      void reply.status(200).send(response);
+      return reply.status(200).send(response);
     } catch (error) {
       this.clearRefreshCookie(reply);
       throw error;
@@ -58,7 +58,7 @@ export class AuthController {
     await this.authService.logout(request.user.sessionId);
     this.clearRefreshCookie(reply);
 
-    void reply.status(200).send({
+    return reply.status(200).send({
       message: 'Logout completed successfully.'
     });
   };
@@ -66,13 +66,13 @@ export class AuthController {
   public forgotPassword = async (request: FastifyRequest<{ Body: ForgotInput }>, reply: FastifyReply): Promise<void> => {
     const result = await this.authService.forgotPassword(request.body);
 
-    void reply.status(200).send(result);
+    return reply.status(200).send(result);
   };
 
   public resetPassword = async (request: FastifyRequest<{ Body: ResetInput }>, reply: FastifyReply): Promise<void> => {
     const result = await this.authService.resetPassword(request.body);
 
-    void reply.status(200).send(result);
+    return reply.status(200).send(result);
   };
 
   private attachRefreshCookie<T extends { meta: { refreshToken: string } }>(reply: FastifyReply, result: T): Omit<T, 'meta'> {
