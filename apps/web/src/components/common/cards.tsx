@@ -1,39 +1,68 @@
-import { ArrowDownLeft, ArrowUpRight, Landmark, PiggyBank } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { cn, formatDate, formatMoney } from "@/lib/utils";
-import type { SavingsPlan, Transaction, Wallet } from "@/types/api";
+import { ArrowDownLeft, ArrowUpRight, Landmark, PiggyBank } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { cn, formatDate, formatMoney } from '@/lib/utils';
+import type { SavingsPlan, Transaction, Wallet } from '@/types/api';
 
 export function BalanceCard({ wallet }: { wallet?: Wallet }) {
   return (
-    <div className="rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-500 p-5 text-white shadow-[0_24px_60px_rgba(37,99,235,0.22)] sm:p-6">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-blue-50">Available balance</span>
-        <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">{wallet?.currency ?? "NGN"}</span>
+    <div
+      style={{ transformStyle: 'preserve-3d', perspective: 1000 }}
+      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-500 p-5 text-white shadow-[0_24px_60px_rgba(37,99,235,0.28)] sm:p-6"
+    >
+      {/* ── Grain texture overlay ── */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+          backgroundRepeat: 'repeat',
+          backgroundSize: '128px 128px'
+        }}
+      />
+
+      {/* ── Decorative circles ── */}
+      <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10" />
+      <div className="pointer-events-none absolute -bottom-10 -left-6 h-48 w-48 rounded-full bg-white/5" />
+      <div className="pointer-events-none absolute bottom-10 right-10 h-20 w-20 rounded-full bg-cyan-400/20" />
+
+      {/* ── Top row: label + currency badge ── */}
+      <div className="relative flex items-center justify-between">
+        <span className="text-xs font-medium uppercase tracking-widest text-blue-100/80">Available balance</span>
+        <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold tracking-wider backdrop-blur-sm">{wallet?.currency ?? 'NGN'}</span>
       </div>
-      <div className="mt-8 break-words text-3xl font-semibold tracking-normal sm:text-4xl">{formatMoney(wallet?.availableBalance)}</div>
-      <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-2xl bg-white/12 p-3">
-          <p className="text-blue-50">Pending</p>
-          <p className="mt-1 font-semibold">{formatMoney(wallet?.pendingBalance)}</p>
+
+      {/* ── Chip ── */}
+      <div className="relative mt-4 flex items-center gap-2">
+        <div className="flex h-7 w-9 flex-col justify-between overflow-hidden rounded-md border border-white/30 bg-gradient-to-br from-yellow-200/90 to-yellow-400/80 p-[3px] shadow-inner">
+          <div className="h-[2px] w-full rounded-full bg-yellow-600/40" />
+          <div className="h-[2px] w-full rounded-full bg-yellow-600/40" />
+          <div className="h-[2px] w-full rounded-full bg-yellow-600/40" />
+          <div className="h-[2px] w-full rounded-full bg-yellow-600/40" />
         </div>
-        <div className="rounded-2xl bg-white/12 p-3">
-          <p className="text-blue-50">Reserved</p>
-          <p className="mt-1 font-semibold">{formatMoney(wallet?.reservedBalance)}</p>
+      </div>
+
+      {/* ── Balance amount ── */}
+      <div className="relative mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{formatMoney(wallet?.availableBalance)}</div>
+
+      {/* ── Bottom row: masked number + brand ── */}
+      <div className="relative mt-5 flex items-end justify-between">
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-widest text-blue-100/60">Wallet ID</p>
+          <p className="font-mono text-sm font-medium tracking-[0.2em] text-white/80">•••• •••• {wallet?.id?.slice(-4) ?? '0000'}</p>
+        </div>
+
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-lg font-black italic tracking-tight text-white/90">Finx</span>
+          <div className="flex items-center gap-1">
+            <div className="h-4 w-4 rounded-full bg-white/30 backdrop-blur-sm" />
+            <div className="-ml-2 h-4 w-4 rounded-full bg-white/20 backdrop-blur-sm" />
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-export function MetricCard({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  icon: typeof Landmark;
-}) {
+export function MetricCard({ label, value, icon: Icon }: { label: string; value: string; icon: typeof Landmark }) {
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between">
@@ -50,7 +79,7 @@ export function MetricCard({
 }
 
 export function TransactionCard({ transaction, onClick }: { transaction: Transaction; onClick?: () => void }) {
-  const isDebit = ["WITHDRAWAL", "P2P_TRANSFER", "FEE"].includes(transaction.type);
+  const isDebit = ['WITHDRAWAL', 'P2P_TRANSFER', 'FEE'].includes(transaction.type);
   return (
     <button
       type="button"
@@ -59,8 +88,8 @@ export function TransactionCard({ transaction, onClick }: { transaction: Transac
     >
       <span
         className={cn(
-          "grid h-11 w-11 shrink-0 place-items-center rounded-2xl",
-          isDebit ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600",
+          'grid h-11 w-11 shrink-0 place-items-center rounded-2xl',
+          isDebit ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
         )}
       >
         {isDebit ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownLeft className="h-5 w-5" />}
@@ -70,8 +99,8 @@ export function TransactionCard({ transaction, onClick }: { transaction: Transac
         <span className="block text-xs text-slate-500">{formatDate(transaction.createdAt)}</span>
       </span>
       <span className="min-w-0 max-w-[48%] text-right">
-        <span className={cn("block text-sm font-semibold", isDebit ? "text-rose-600" : "text-emerald-600")}>
-          {isDebit ? "-" : "+"}
+        <span className={cn('block text-sm font-semibold', isDebit ? 'text-rose-600' : 'text-emerald-600')}>
+          {isDebit ? '-' : '+'}
           {formatMoney(transaction.amount, transaction.currency)}
         </span>
         <span className="text-xs text-slate-400">{transaction.status}</span>

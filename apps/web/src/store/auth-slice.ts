@@ -1,5 +1,24 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { User, Wallet } from "@/types/api";
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { User, Wallet } from '@/types/api';
+
+const persisted = (() => {
+  try {
+    return JSON.parse(localStorage.getItem('finx.session') ?? 'null') as Pick<
+      AuthState,
+      'token' | 'user'
+    > | null;
+  } catch {
+    return null;
+  }
+})();
+
+const persist = (state: AuthState) => {
+  if (!state.token || !state.user) {
+    localStorage.removeItem('finx.session');
+    return;
+  }
+  localStorage.setItem('finx.session', JSON.stringify({ token: state.token, user: state.user }));
+};
 
 type AuthState = {
   token: string | null;
@@ -8,33 +27,18 @@ type AuthState = {
   initialWallet?: Wallet;
 };
 
-const persisted = (() => {
-  try {
-    return JSON.parse(localStorage.getItem("finx.session") ?? "null") as Pick<AuthState, "token" | "user"> | null;
-  } catch {
-    return null;
-  }
-})();
-
 const initialState: AuthState = {
   token: persisted?.token ?? null,
   user: persisted?.user ?? null,
   bootstrapComplete: true,
 };
 
-const persist = (state: AuthState) => {
-  if (!state.token || !state.user) {
-    localStorage.removeItem("finx.session");
-    return;
-  }
-  localStorage.setItem("finx.session", JSON.stringify({ token: state.token, user: state.user }));
-};
-
 export const authSlice = createSlice({
-  name: "auth",
+  name: 'auth',
   initialState,
   reducers: {
     setSession: (state, action: PayloadAction<{ token: string; user: User; wallet?: Wallet }>) => {
+      console.log('[REDUCER PAYLOAD SHAPE : ]', action.payload);
       state.token = action.payload.token;
       state.user = action.payload.user;
       state.initialWallet = action.payload.wallet;
