@@ -12,6 +12,7 @@ import { AuthRepository } from './auth.repository';
 import type { ForgotInput, LoginInput, RegisterInput, ResetInput } from './http/auth.schema';
 import logger from '../../utils/logger';
 import { mockVerifyPhoneNumber } from './auth.helpers';
+import { appConfig } from '../../config/app.config';
 
 const PASSWORD_RESET_TOKEN_TTL_MINUTES = 15;
 const MAX_FINX_TAG_GENERATION_ATTEMPTS = 10;
@@ -55,12 +56,14 @@ export class AuthService {
       type: argon2.argon2id
     });
 
+    const defaultAvatar = `https://api.dicebear.com/9.x/adventurer/svg?seed=${input.email}`;
+
     for (let attempt = 0; attempt < MAX_FINX_TAG_GENERATION_ATTEMPTS; attempt += 1) {
       logger.info('[AUTH] generating finxTag', { attempt });
       const finxTag = await this.generateUniqueFinxTag(input, attempt);
 
       try {
-        const createdAccount = await this.authRepository.registerUserWithWallet(input, passwordHash, finxTag);
+        const createdAccount = await this.authRepository.registerUserWithWallet(input, passwordHash, finxTag, defaultAvatar);
 
         logger.info('[AUTH] user created successfully', {
           userId: createdAccount.user.id,

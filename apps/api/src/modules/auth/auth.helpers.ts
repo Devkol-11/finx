@@ -1,3 +1,6 @@
+import { FastifyReply, FastifyRequest } from 'fastify';
+import { RegisterInput } from './http/auth.schema';
+
 function maskPhone(phone: string): string {
   return phone.slice(0, 4) + '*'.repeat(4) + phone.slice(-3);
 }
@@ -117,4 +120,8 @@ export function mockVerifyPhoneNumber(phoneNumber: string): PhoneVerificationRes
     maskedPhone: maskPhone(normalized),
     verifiedAt
   };
+}
+
+export function validateRegisterRequest(request: FastifyRequest<{ Body: RegisterInput }>, reply: FastifyReply) {
+  const body = request.body;
 }

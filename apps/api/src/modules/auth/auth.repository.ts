@@ -95,45 +95,55 @@ export class AuthRepository {
     return Boolean(exists);
   }
 
-  public async registerUserWithWallet(input: RegisterInput, passwordHash: string, finxTag: string) {
+  public async registerUserWithWallet(input: RegisterInput, passwordHash: string, finxTag: string, defaultAvatar: string) {
     logger.info('[AUTH] creating user + wallet', {
       email: input.email,
       finxTag
     });
-    return this.prisma.$transaction(async (transaction) => {
-      const createdUser = await transaction.user.create({
-        data: {
-          email: input.email,
-          phoneNumber: input.phoneNumber,
-          firstName: input.firstName.trim(),
-          lastName: input.lastName.trim(),
-          isPhoneVerified: true,
-          isEmailVerified: true,
-          passwordHash,
-          finxTag,
-          status: UserStatus.ACTIVE
-        }
-      });
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const createdUser = await transaction.user.create({
+          data: {
+            email: input.email,
+            phoneNumber: input.phoneNumber,
+            firstName: input.firstName.trim(),
+            lastName: input.lastName.trim(),
+            isPhoneVerified: true,
+            isEmailVerified: true,
+            passwordHash,
+            finxTag,
+            status: UserStatus.ACTIVE
+          }
+        });
 
-      const createdWallet = await transaction.wallet.create({
-        data: {
-          userId: createdUser.id,
-          type: WalletType.FIAT,
-          currency: WalletCurrency.NGN
-        }
-      });
+        const createdWallet = await transaction.wallet.create({
+          data: {
+            userId: createdUser.id,
+            type: WalletType.FIAT,
+            currency: WalletCurrency.NGN
+          }
+        });
 
-      await transaction.kycProfile.create({
-        data: {
-          userId: createdUser.id
-        }
-      });
+        await transaction.kycProfile.create({
+          data: {
+            userId: createdUser.id
+          }
+        });
 
-      return {
-        user: createdUser,
-        wallet: createdWallet
-      };
-    });
+        await transaction.profile.create({
+          data: {
+            userId: createdUser.id,
+            avatarUrl: defaultAvatar
+          }
+        });
+
+        return {
+          user: createdUser,
+          wallet: createdWallet
+        };
+      },
+      { timeout: 15000 }
+    );
   }
 
   public async updateLastLoginAt(userId: string): Promise<void> {
@@ -154,45 +164,51 @@ export class AuthRepository {
       return null;
     }
 
-    await this.prisma.$transaction(async (transaction) => {
-      await this.invalidateOutstandingPasswordResetTokens(transaction, user.id);
+    await this.prisma.$transaction(
+      async (transaction) => {
+        await this.invalidateOutstandingPasswordResetTokens(transaction, user.id);
 
-      await transaction.passwordResetToken.create({
-        data: {
-          userId: user.id,
-          tokenHash,
-          expiresAt
-        }
-      });
-    });
+        await transaction.passwordResetToken.create({
+          data: {
+            userId: user.id,
+            tokenHash,
+            expiresAt
+          }
+        });
+      },
+      { timeout: 15000 }
+    );
 
     return user;
   }
 
   public async resetPassword(userId: string, resetTokenId: string, passwordHash: string): Promise<void> {
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.user.update({
-        where: {
-          id: userId
-        },
-        data: {
-          passwordHash
-        }
-      });
+    await this.prisma.$transaction(
+      async (transaction) => {
+        await transaction.user.update({
+          where: {
+            id: userId
+          },
+          data: {
+            passwordHash
+          }
+        });
 
-      await transaction.passwordResetToken.update({
-        where: {
-          id: resetTokenId
-        },
-        data: {
-          usedAt: new Date()
-        }
-      });
+        await transaction.passwordResetToken.update({
+          where: {
+            id: resetTokenId
+          },
+          data: {
+            usedAt: new Date()
+          }
+        });
 
-      await this.invalidateOutstandingPasswordResetTokens(transaction, userId, resetTokenId);
+        await this.invalidateOutstandingPasswordResetTokens(transaction, userId, resetTokenId);
 
-      await this.revokeAllSessionsForUser(userId, SessionRevocationReason.PASSWORD_RESET, transaction);
-    });
+        await this.revokeAllSessionsForUser(userId, SessionRevocationReason.PASSWORD_RESET, transaction);
+      },
+      { timeout: 15000 }
+    );
   }
 
   public async createSession(input: {
@@ -235,33 +251,36 @@ export class AuthRepository {
     userAgent?: string | undefined;
     ipAddress?: string | undefined;
   }) {
-    return this.prisma.$transaction(async (transaction) => {
-      const newSession = await transaction.session.create({
-        data: {
-          id: input.newSessionId,
-          userId: input.userId,
-          refreshTokenHash: input.refreshTokenHash,
-          expiresAt: input.expiresAt,
-          userAgent: input.userAgent ?? null,
-          ipAddress: input.ipAddress ?? null,
-          lastUsedAt: new Date()
-        }
-      });
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const newSession = await transaction.session.create({
+          data: {
+            id: input.newSessionId,
+            userId: input.userId,
+            refreshTokenHash: input.refreshTokenHash,
+            expiresAt: input.expiresAt,
+            userAgent: input.userAgent ?? null,
+            ipAddress: input.ipAddress ?? null,
+            lastUsedAt: new Date()
+          }
+        });
 
-      await transaction.session.update({
-        where: {
-          id: input.currentSessionId
-        },
-        data: {
-          revokedAt: new Date(),
-          revocationReason: SessionRevocationReason.ROTATED,
-          replacedBySessionId: newSession.id,
-          lastUsedAt: new Date()
-        }
-      });
+        await transaction.session.update({
+          where: {
+            id: input.currentSessionId
+          },
+          data: {
+            revokedAt: new Date(),
+            revocationReason: SessionRevocationReason.ROTATED,
+            replacedBySessionId: newSession.id,
+            lastUsedAt: new Date()
+          }
+        });
 
-      return newSession;
-    });
+        return newSession;
+      },
+      { timeout: 15000 }
+    );
   }
 
   public async markSessionUsed(sessionId: string): Promise<void> {
@@ -304,20 +323,23 @@ export class AuthRepository {
   }
 
   public async flagRefreshTokenReuse(sessionId: string, userId: string): Promise<void> {
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.session.update({
-        where: {
-          id: sessionId
-        },
-        data: {
-          reuseDetectedAt: new Date(),
-          revokedAt: new Date(),
-          revocationReason: SessionRevocationReason.TOKEN_REUSE_DETECTED
-        }
-      });
+    await this.prisma.$transaction(
+      async (transaction) => {
+        await transaction.session.update({
+          where: {
+            id: sessionId
+          },
+          data: {
+            reuseDetectedAt: new Date(),
+            revokedAt: new Date(),
+            revocationReason: SessionRevocationReason.TOKEN_REUSE_DETECTED
+          }
+        });
 
-      await this.revokeAllSessionsForUser(userId, SessionRevocationReason.TOKEN_REUSE_DETECTED, transaction);
-    });
+        await this.revokeAllSessionsForUser(userId, SessionRevocationReason.TOKEN_REUSE_DETECTED, transaction);
+      },
+      { timeout: 15000 }
+    );
   }
 
   private async invalidateOutstandingPasswordResetTokens(transaction: TransactionClient, userId: string, excludeTokenId?: string): Promise<void> {

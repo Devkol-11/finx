@@ -78,7 +78,7 @@ export const env = {
   PAYSTACK_SECRET_KEY: isProduction ? parsedEnvironment.data.PAYSTACK_SECRET_KEY_PROD : parsedEnvironment.data.PAYSTACK_SECRET_KEY_DEV,
   HOST: parsedEnvironment.data.HOST ?? '0.0.0.0',
   REQUEST_BODY_LIMIT_BYTES: parsedEnvironment.data.REQUEST_BODY_LIMIT_BYTES ?? 1_048_576,
-  ACCESS_TOKEN_TTL: '15m',
+  ACCESS_TOKEN_TTL: '3d',
   REFRESH_TOKEN_TTL: '7d',
   REFRESH_TOKEN_COOKIE_NAME: 'finx_refresh_token'
 } as const;

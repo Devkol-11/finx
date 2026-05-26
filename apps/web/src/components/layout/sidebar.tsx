@@ -1,36 +1,21 @@
-import { NavLink } from "react-router-dom";
-import {
-  BadgeCheck,
-  CreditCard,
-  Home,
-  Landmark,
-  LogOut,
-  PiggyBank,
-  ReceiptText,
-  Send,
-  Settings,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { clearSession } from "@/store/auth-slice";
-import { useAppDispatch } from "@/store/hooks";
-import { cn } from "@/lib/utils";
+import { NavLink } from 'react-router-dom';
+import { BadgeCheck, Home, Landmark, LogOut, PiggyBank, ReceiptText, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { clearSession } from '@/store/auth-slice';
+import { useAppDispatch } from '@/store/hooks';
+import { cn } from '@/lib/utils';
 
 const nav = [
-  { to: "/app/dashboard", label: "Dashboard", icon: Home },
-  { to: "/app/wallet", label: "Wallet", icon: CreditCard },
-  { to: "/app/transfers", label: "Transfers", icon: Send },
-  { to: "/app/transactions", label: "Activity", icon: ReceiptText },
-  { to: "/app/savings", label: "Savings", icon: PiggyBank },
-  { to: "/app/kyc", label: "KYC", icon: BadgeCheck },
-  { to: "/app/settings", label: "Settings", icon: Settings },
+  { to: '/app/dashboard', label: 'Dashboard', icon: Home },
+  { to: '/app/transactions', label: 'Activity', icon: ReceiptText },
+  { to: '/app/savings', label: 'Savings', icon: PiggyBank },
+  { to: '/app/settings', label: 'Settings', icon: Settings }
 ];
 
 export function Brand() {
   return (
     <div className="flex items-center gap-3">
-      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-200">
-        FX
-      </div>
+      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-200">FX</div>
       <div>
         <p className="text-lg font-semibold text-slate-950">Finx</p>
         <p className="text-xs text-slate-500">Wallet and savings</p>
@@ -51,8 +36,8 @@ export function Sidebar() {
             to={item.to}
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition",
-                isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
+                'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition',
+                isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
               )
             }
           >

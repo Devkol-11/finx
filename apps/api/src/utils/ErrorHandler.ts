@@ -121,14 +121,25 @@ export interface StandardErrorResponse {
 /**
  * Transforms a Zod error into a client-safe payload that callers can act on.
  */
-export const formatZodError = (error: ZodError): StandardErrorResponse => ({
-  statusCode: 400,
-  error: 'Bad Request',
-  message: 'Request validation failed.',
-  code: 'VALIDATION_ERROR',
-  details: error.issues.map((issue) => ({
-    path: issue.path.join('.'),
+export const formatZodError = (error: ZodError): StandardErrorResponse => {
+  const issues = error.issues.map((issue) => ({
+    field: issue.path.join('.'),
     message: issue.message,
-    code: issue.code
-  }))
-});
+    code: issue.code,
+    expected: 'expected' in issue ? issue.expected : undefined,
+    received: 'received' in issue ? issue.received : undefined
+  }));
+
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of issues) {
+    fieldErrors[issue.field] = issue.message;
+  }
+
+  return {
+    statusCode: 400,
+    error: 'Bad Request',
+    message: 'Request validation failed.',
+    code: 'VALIDATION_ERROR',
+    details: issues
+  };
+};

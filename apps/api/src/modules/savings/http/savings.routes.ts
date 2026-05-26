@@ -25,7 +25,7 @@ export const savingsRoute: FastifyPluginAsync = async (fastify) => {
     {
       config: {
         rateLimit: {
-          max: 5,
+          max: 500,
           timeWindow: '1 minute'
         }
       },
@@ -41,7 +41,7 @@ export const savingsRoute: FastifyPluginAsync = async (fastify) => {
     {
       config: {
         rateLimit: {
-          max: 5,
+          max: 500,
           timeWindow: '1 minute'
         }
       },
@@ -57,7 +57,7 @@ export const savingsRoute: FastifyPluginAsync = async (fastify) => {
     {
       config: {
         rateLimit: {
-          max: 5,
+          max: 500,
           timeWindow: '1 minute'
         }
       },
@@ -72,7 +72,7 @@ export const savingsRoute: FastifyPluginAsync = async (fastify) => {
     {
       config: {
         rateLimit: {
-          max: 5,
+          max: 500,
           timeWindow: '1 minute'
         }
       },
@@ -91,7 +91,7 @@ export const savingsRoute: FastifyPluginAsync = async (fastify) => {
     {
       config: {
         rateLimit: {
-          max: 5,
+          max: 500,
           timeWindow: '1 minute'
         }
       },
@@ -110,7 +110,7 @@ export const savingsRoute: FastifyPluginAsync = async (fastify) => {
     {
       config: {
         rateLimit: {
-          max: 5,
+          max: 500,
           timeWindow: '1 minute'
         }
       },

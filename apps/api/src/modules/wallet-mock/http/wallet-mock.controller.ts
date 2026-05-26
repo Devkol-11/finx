@@ -13,7 +13,7 @@ export class WalletMockController {
   };
 
   public transferP2P = async (request: FastifyRequest<{ Body: TransferInput }>, reply: FastifyReply): Promise<void> => {
-    const result = await this.walletMockService.transferP2P(request.user.userId, request.body);
+    const result = await this.walletMockService.transferP2P(request.user.userId, request.user.email, request.body);
     void reply.status(200).send(result);
   };
 

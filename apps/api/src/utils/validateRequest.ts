@@ -1,20 +1,43 @@
-import type { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from "fastify";
-import type { ZodTypeAny } from "zod";
+import type { FastifyReply, FastifyRequest, HookHandlerDoneFunction } from 'fastify';
+import { ZodError, type ZodTypeAny } from 'zod';
 
-type RequestPart = "body" | "params" | "query";
+type RequestPart = 'body' | 'params' | 'query';
 
-/**
- * Reusable request validator that parses a specific Fastify request segment
- * and replaces it with the validated/normalized Zod output.
- */
 export const validateRequest =
   <TSchema extends ZodTypeAny>(part: RequestPart, schema: TSchema) =>
-  (request: FastifyRequest, _reply: FastifyReply, done: HookHandlerDoneFunction): void => {
-    const parsedValue = schema.parse(request[part]);
+  (request: FastifyRequest, reply: FastifyReply, done: HookHandlerDoneFunction): void => {
+    try {
+      const parsedValue = schema.parse(request[part]);
+      Object.assign(request, { [part]: parsedValue });
+      done();
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const issues = error.issues.map((issue) => ({
+          field: issue.path.join('.'),
+          message: issue.message,
+          code: issue.code,
+          expected: 'expected' in issue ? issue.expected : undefined,
+          received: 'received' in issue ? issue.received : undefined
+        }));
 
-    Object.assign(request, {
-      [part]: parsedValue,
-    });
+        // Build a frontend-friendly error map
+        const fieldErrors: Record<string, string> = {};
+        for (const issue of issues) {
+          fieldErrors[issue.field] = issue.message;
+        }
 
-    done();
+        reply.status(400).send({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Validation failed',
+          code: 'ZOD_VALIDATION_ERROR',
+          details: issues,
+          fieldErrors: fieldErrors,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      done(error as Error);
+    }
   };

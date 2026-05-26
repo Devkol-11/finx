@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { useDispatch } from 'react-redux';
 import { AlertCircle, BadgeCheck, ChevronDown, FileSearch, Lock, ShieldCheck, UserCheck } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/common/page-header';
@@ -6,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { kycApi } from '@/features/kyc/api';
+import { useAppSelector } from '@/store/hooks';
+import { setKycVerified } from '@/store/auth-slice';
 
 const steps = [
   { icon: UserCheck, label: 'Submit your BVN' },
@@ -15,19 +18,25 @@ const steps = [
 
 export default function KycPage() {
   const [bvn, setBvn] = useState('');
+  const dispatch = useDispatch();
+
+  const kycVerified = useAppSelector((state) => state.auth.user?.kycVerified ?? false);
 
   const mutation = useMutation({
-    mutationFn: (bvnInput: string) => kycApi.verifyBvn(bvnInput)
+    mutationFn: (bvnInput: string) => kycApi.verifyBvn(bvnInput),
+    onSuccess: (data) => {
+      if (data.success) {
+        dispatch(setKycVerified(true));
+      }
+    }
   });
 
-  const isAlreadyVerified = mutation.isSuccess && mutation.data?.success === true && mutation.data?.alreadyVerified === true;
-
-  const isVerified = mutation.isSuccess && mutation.data?.success === true && mutation.data?.alreadyVerified === false;
+  const wasAlreadyVerified = kycVerified && mutation.isSuccess && mutation.data?.alreadyVerified === true;
 
   const failed = mutation.isError;
 
   // ── Already verified screen ──
-  if (isAlreadyVerified) {
+  if (kycVerified && wasAlreadyVerified) {
     return (
       <div className="mx-auto max-w-2xl space-y-5">
         <PageHeader title="KYC verification" description="Verify your identity to unlock higher wallet limits and full access." />
@@ -64,8 +73,8 @@ export default function KycPage() {
     );
   }
 
-  // ── Fresh verification success screen ──
-  if (isVerified) {
+  // ── Verified screen (fresh verify OR returning user loaded from Redux/localStorage) ──
+  if (kycVerified) {
     return (
       <div className="mx-auto max-w-2xl space-y-5">
         <PageHeader title="KYC verification" description="Verify your identity to unlock higher wallet limits and full access." />

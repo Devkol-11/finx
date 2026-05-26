@@ -3,6 +3,7 @@ import { PrismaClientInitializationError, PrismaClientKnownRequestError, PrismaC
 import { ZodError } from 'zod';
 import { env } from '../config/env';
 import { AppError, formatZodError, StandardErrorResponse } from '../utils/ErrorHandler';
+import { logError } from '../utils/logger';
 
 const HTTP_STATUS_TEXT: Record<number, string> = {
   400: 'Bad Request',
@@ -60,65 +61,32 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
       message?: string;
       stack?: string;
     };
-    const prismaMappedError = mapPrismaError(error);
 
     // 1. Handle Known Operational App Errors First
     if (error instanceof AppError) {
       const payload = buildResponse(error.statusCode, error.message, error.code ?? 'APPLICATION_ERROR', error.details);
-      console.log('[ERROR PAYLOAD AFTER BUILD : ', payload);
 
-      request.log.warn(
-        {
-          err: error,
-          code: payload.code,
-          details: error.details
-        },
-        'Operational application error handled.'
-      );
+      request.log.warn({ err: error, code: payload.code, details: error.details }, 'Operational application error handled.');
 
       void reply.status(payload.statusCode).send(payload);
       return;
     }
 
-    if ((error as any)?.name === 'ZodError') {
-      const zodError = error as ZodError;
+    // 2. Handle Zod Validation Errors
+    if (error instanceof ZodError) {
+      const payload = formatZodError(error);
 
-      const payload = formatZodError(zodError);
-
-      request.log.warn(
-        {
-          err: error,
-          code: payload.code,
-          details: payload.details
-        },
-        'Zod validation error handled.'
-      );
+      request.log.warn({ err: error, code: payload.code, details: payload.details }, 'Zod validation error handled.');
 
       void reply.status(payload.statusCode).send(payload);
       return;
     }
 
-    if ((error as any).name === 'AppError' && (error as any).code === 'UNABLE_TO_PROCESS') {
-      console.log(['ERR : ', error]);
-      const payload = buildResponse((error as any).statusCode, (error as any).message ?? '', (error as any).code);
-      request.log.warn({
-        err: payload.error,
-        code: payload.code,
-        details: payload.code
-      });
-
-      void reply.status(payload.statusCode).send(payload);
-    }
+    // 3. Handle Prisma Errors
+    const prismaMappedError = mapPrismaError(error);
     if (prismaMappedError) {
-      // ==========================================
-
-      // 3. Handle Database / Prisma Failures
       request.log.error(
-        {
-          err: error,
-          code: prismaMappedError.code,
-          details: prismaMappedError.details
-        },
+        { err: error, code: prismaMappedError.code, details: prismaMappedError.details },
         'Prisma error handled by global error layer.'
       );
 
@@ -138,14 +106,7 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
         issues: validationError.validation
       });
 
-      request.log.warn(
-        {
-          err: error,
-          code: payload.code,
-          details: payload.details
-        },
-        'Fastify validation error handled.'
-      );
+      request.log.warn({ err: error, code: payload.code, details: payload.details }, 'Fastify validation error handled.');
 
       void reply.status(payload.statusCode).send(payload);
       return;
@@ -159,28 +120,19 @@ const errorPluginCallback: FastifyPluginAsync = async (fastify: FastifyInstance)
       return;
     }
 
-    // 6. Final Catch-All / Fallback Layer (Unhandeld 500s)
+    // 6. Final Catch-All / Fallback Layer
     const statusCode = fastifyError.statusCode && fastifyError.statusCode >= 400 ? fastifyError.statusCode : 500;
 
     const payload = buildResponse(
       statusCode,
       statusCode >= 500 && env.NODE_ENV === 'production' ? 'Internal server error.' : fastifyError.message || 'An unexpected error occurred.',
       statusCode >= 500 ? 'INTERNAL_SERVER_ERROR' : 'UNHANDLED_APPLICATION_ERROR',
-      env.NODE_ENV === 'production' || statusCode < 500
-        ? undefined
-        : {
-            stack: fastifyError.stack
-          }
+      env.NODE_ENV === 'production' || statusCode < 500 ? undefined : { stack: fastifyError.stack }
     );
 
-    request.log.error(
-      {
-        err: error,
-        code: payload.code,
-        requestId: request.id
-      },
-      'Unhandled error reached the global error handler.'
-    );
+    logError('Unhandled error reached the global error handler.', { err: error, code: payload.code, requestId: request.id });
+
+    request.log.error({ err: error, code: payload.code, requestId: request.id }, 'Unhandled error reached the global error handler.');
 
     void reply.status(payload.statusCode).send(payload);
   });

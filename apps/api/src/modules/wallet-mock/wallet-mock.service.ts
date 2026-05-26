@@ -3,6 +3,8 @@ import { AppError } from '../../utils/ErrorHandler';
 import type { BalanceQueryInput, DepositInput, TransactionsQueryInput, TransferInput, WithdrawInput } from './http/wallet-mock.schema';
 import { WalletMockRpository } from './wallet-mock.repository';
 import { verifyUserKycProfile } from './wallet-mock.helpers';
+import { queuePublishEmail } from '../pub-sub';
+import { EMAIL_TEMPLATES } from '../../utils/emailTemplates';
 
 export class WalletMockService {
   constructor(private readonly walletMockRepo: WalletMockRpository) {}
@@ -35,7 +37,7 @@ export class WalletMockService {
     };
   }
 
-  public async transferP2P(senderUserId: string, input: TransferInput) {
+  public async transferP2P(senderUserId: string, senderEmail: string, input: TransferInput) {
     const isKycVerified = await verifyUserKycProfile(senderUserId);
     if (!isKycVerified.verified) {
       const err = new AppError('Unable to transfer , Kyc not verified', 200);
@@ -56,6 +58,15 @@ export class WalletMockService {
     }
 
     const result = await this.walletMockRepo.executeP2PTransfer(senderUserId, input, `p2p_${randomUUID()}`);
+
+    if (result.success) {
+      const transferMailSubject = EMAIL_TEMPLATES.TRANSFER.subject(input.amount);
+      const transferMailBody = EMAIL_TEMPLATES.TRANSFER.body(senderEmail, input.amount, receiverWallet.user.finxTag);
+      const depositMailSubject = EMAIL_TEMPLATES.DEPOSIT.subject(input.amount);
+      const depositMailBody = EMAIL_TEMPLATES.DEPOSIT.body(receiverWallet.user.email, input.amount);
+      await queuePublishEmail({ to: senderEmail, subject: transferMailSubject, body: transferMailBody });
+      await queuePublishEmail({ to: receiverWallet.user.email, subject: depositMailSubject, body: depositMailBody });
+    }
 
     return {
       message: 'Transfer completed successfully.',
@@ -111,6 +122,10 @@ export class WalletMockService {
     }
 
     const result = await this.walletMockRepo.postMockFiatDeposit(reference);
+
+    const subject = EMAIL_TEMPLATES.DEPOSIT.subject(input.amount);
+    const body = EMAIL_TEMPLATES.DEPOSIT.body(email, input.amount);
+    await queuePublishEmail({ to: email, subject, body });
 
     return {
       message: 'Deposit completed successfully.',

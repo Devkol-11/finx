@@ -20,6 +20,7 @@ import { webhookRoutes } from './modules/webhooks/http/webhook.route';
 import { mapJwtError } from './plugins/auth';
 import { AppError } from './utils/ErrorHandler';
 import { kycRoutes } from './modules/kyc/http/kyc.routes';
+import { profileRoutes } from './modules/profile/http/profile.routes';
 
 const requestStarts = new WeakMap<FastifyRequest, bigint>();
 
@@ -294,6 +295,10 @@ export const buildApp = async () => {
 
   await app.register(kycRoutes, {
     prefix: '/api/v1/kyc'
+  });
+
+  await app.register(profileRoutes, {
+    prefix: '/api/v1/profile'
   });
 
   await app.register(paymentRoutes, {

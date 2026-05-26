@@ -3,10 +3,7 @@ import type { User, Wallet } from '@/types/api';
 
 const persisted = (() => {
   try {
-    return JSON.parse(localStorage.getItem('finx.session') ?? 'null') as Pick<
-      AuthState,
-      'token' | 'user'
-    > | null;
+    return JSON.parse(localStorage.getItem('finx.session') ?? 'null') as Pick<AuthState, 'token' | 'user'> | null;
   } catch {
     return null;
   }
@@ -30,7 +27,7 @@ type AuthState = {
 const initialState: AuthState = {
   token: persisted?.token ?? null,
   user: persisted?.user ?? null,
-  bootstrapComplete: true,
+  bootstrapComplete: true
 };
 
 export const authSlice = createSlice({
@@ -42,6 +39,9 @@ export const authSlice = createSlice({
       state.token = action.payload.token;
       state.user = action.payload.user;
       state.initialWallet = action.payload.wallet;
+        if (!state.user.avatarUrl) {
+        state.user.avatarUrl = `https://api.dicebear.com/9.x/adventurer/svg?seed=${Math.random().toString(36).substring(2, 10)}`;
+      }
       persist(state);
     },
     clearSession: (state) => {
@@ -50,8 +50,18 @@ export const authSlice = createSlice({
       state.initialWallet = undefined;
       persist(state);
     },
-  },
+    setKycVerified: (state, action: PayloadAction<boolean>) => {
+      if (!state.user) return;
+      state.user.kycVerified = action.payload;
+      persist(state);
+    },
+    setAvatarUrl: (state, action: PayloadAction<string>) => {
+      if (!state.user) return;
+      state.user.avatarUrl = action.payload;
+      persist(state);
+    }
+  }
 });
 
-export const { setSession, clearSession } = authSlice.actions;
+export const { setSession, clearSession, setKycVerified, setAvatarUrl } = authSlice.actions;
 export const authReducer = authSlice.reducer;

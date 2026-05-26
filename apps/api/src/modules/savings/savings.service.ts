@@ -2,6 +2,7 @@ import { CancelSavingsPlanInput, CreateSavingsPlanInput, FundSavingsPlanInput, W
 import { SavingsRepository } from './savings.repository';
 import { AppError } from '../../utils/ErrorHandler';
 import { Prisma } from '@prisma/client';
+import { logError } from '../../utils/logger';
 
 export class SavingsService {
   constructor(private readonly savingsRepo: SavingsRepository) {}
@@ -11,7 +12,6 @@ export class SavingsService {
       throw AppError.badRequest('Wallet not found or active');
     }
 
-    console.log('GOT INTO SERVICE');
     const base = {
       userId,
       walletId: wallet!.id,
@@ -76,6 +76,11 @@ export class SavingsService {
 
     if (plan.userId !== userId) {
       throw AppError.forbidden('Unauthorized access to savings plan');
+    }
+
+    if (data.amount > String(plan.currentAmount)) {
+      logError('Insufficient Savings plan balance');
+      throw AppError.badRequest('Insufficient Savings plan balance');
     }
 
     const updatedPlan = await this.savingsRepo.withdrawFromSavings({

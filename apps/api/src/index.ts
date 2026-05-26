@@ -3,6 +3,7 @@ import { appConfig } from './config/app.config';
 import { env } from './config/env';
 import { prisma } from './lib/prisma';
 import { connectRedis, disconnectRedis } from './lib/redis';
+import { runProfileScript } from './scripts/profile';
 import { startWorkers } from './workers/worker-manager';
 
 let shuttingDown = false;

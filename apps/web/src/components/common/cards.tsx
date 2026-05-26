@@ -110,7 +110,27 @@ export function TransactionCard({ transaction, onClick }: { transaction: Transac
 }
 
 export function SavingsCard({ plan }: { plan: SavingsPlan }) {
-  const progress = plan.targetAmount > 0 ? Math.min(100, Math.round((plan.savedAmount / plan.targetAmount) * 100)) : 0;
+  const currentAmount = parseFloat(plan.currentAmount) || 0;
+  const targetAmount = plan.targetAmount ? parseFloat(plan.targetAmount) : null;
+
+  const progress = targetAmount && targetAmount > 0 ? Math.min(100, Math.round((currentAmount / targetAmount) * 100)) : null;
+
+  const typeLabel = plan.type === 'FLEXIBLE' ? 'Flexible' : plan.type === 'LOCKED' ? 'Locked' : 'Target';
+
+  const statusLabel = plan.status.charAt(0) + plan.status.slice(1).toLowerCase();
+  const statusColor =
+    plan.status === 'ACTIVE'
+      ? 'bg-emerald-50 text-emerald-700'
+      : plan.status === 'MATURED'
+      ? 'bg-blue-50 text-blue-700'
+      : plan.status === 'CANCELLED'
+      ? 'bg-red-50 text-red-700'
+      : 'bg-gray-100 text-gray-600';
+
+  const unlockDate = plan.unlockDate
+    ? new Date(plan.unlockDate).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+
   return (
     <Card className="p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -119,17 +139,30 @@ export function SavingsCard({ plan }: { plan: SavingsPlan }) {
             <PiggyBank className="h-5 w-5" />
             <span className="text-sm font-semibold">{plan.name}</span>
           </div>
-          <p className="mt-3 break-words text-2xl font-semibold text-slate-950">{formatMoney(plan.savedAmount)}</p>
-          <p className="text-sm text-slate-500">Target: {formatMoney(plan.targetAmount)}</p>
+          <p className="mt-3 break-words text-2xl font-semibold text-slate-950">{formatMoney(plan.currentAmount)}</p>
+          {targetAmount && <p className="text-sm text-slate-500">Target: {formatMoney(plan.targetAmount!)}</p>}
         </div>
-        <span className="w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{plan.status}</span>
+        <span className={`w-fit rounded-full px-3 py-1 text-xs font-semibold ${statusColor}`}>{statusLabel}</span>
       </div>
-      <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
-        <div className="h-full rounded-full bg-blue-600" style={{ width: `${progress}%` }} />
-      </div>
-      <p className="mt-2 text-xs text-slate-500">
-        {progress}% saved - {plan.frequency} - matures {formatDate(plan.maturityDate)}
-      </p>
+
+      {progress !== null && (
+        <>
+          <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full bg-blue-600" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            {progress}% saved - {typeLabel}
+            {plan.type === 'LOCKED' && unlockDate && ` - unlocks ${unlockDate}`}
+          </p>
+        </>
+      )}
+
+      {progress === null && (
+        <p className="mt-2 text-xs text-slate-500">
+          {typeLabel} savings
+          {plan.type === 'LOCKED' && unlockDate && ` - unlocks ${unlockDate}`}
+        </p>
+      )}
     </Card>
   );
 }
