@@ -5,14 +5,27 @@ import { WalletMockRpository } from './wallet-mock.repository';
 import { verifyUserKycProfile } from './wallet-mock.helpers';
 import { queuePublishEmail } from '../pub-sub';
 import { EMAIL_TEMPLATES } from '../../utils/emailTemplates';
+import { getRedisApi } from '../../lib/redis';
+import Redis from 'ioredis';
+import { logInfo } from '../../utils/logger';
 
 export class WalletMockService {
-  constructor(private readonly walletMockRepo: WalletMockRpository) {}
+  private cache!: Redis;
+  private readonly walletCacheKey;
+  constructor(private readonly walletMockRepo: WalletMockRpository) {
+    this.walletCacheKey = (userId: string) => `recent:wallet:activity:${userId}`;
+  }
 
   public async getBalance(userId: string, input: BalanceQueryInput) {
+    // this.cache = getRedisApi();
+    // const cacheKey = this.walletCacheKey(userId);
+    // const activityExists = await this.cache.get(cacheKey);
+    // if (activityExists) {
+    //   logInfo('[ACTIVITY CACHE HIT');
+    //   return JSON.parse(activityExists);
+    // }
     const { wallet, recentActivity } = await this.walletMockRepo.getBalanceWithRecentActivity(userId, input);
-
-    return {
+    const activity = {
       message: 'Wallet balance retrieved successfully.',
       data: {
         wallet: {
@@ -35,6 +48,11 @@ export class WalletMockService {
         }))
       }
     };
+
+    // await this.cache.setex(cacheKey, 172800, JSON.stringify(activity));
+    // logInfo('[ACTIVITY CACHE SAVE');
+
+    return activity;
   }
 
   public async transferP2P(senderUserId: string, senderEmail: string, input: TransferInput) {

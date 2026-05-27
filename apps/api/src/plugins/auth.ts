@@ -31,5 +31,3 @@ export const mapJwtError = (
 
   return AppError.unauthorized('Authentication is required.');
 };
-
-export const authPlugin: FastifyPluginAsync = async (fastify) => {};

@@ -14,7 +14,6 @@ import { walletMockRoutes } from './modules/wallet-mock/http/wallet-mock.routes'
 import { savingsRoute } from './modules/savings/http/savings.routes';
 import { recordHttpError, recordHttpRequest, renderPrometheusMetrics } from './modules/observability/metrics';
 import { paymentRoutes } from './modules/payments/http/payment.routes';
-import { authPlugin } from './plugins/auth';
 import { errorPlugin } from './plugins/errorPlugin';
 import { webhookRoutes } from './modules/webhooks/http/webhook.route';
 import { mapJwtError } from './plugins/auth';
@@ -283,7 +282,6 @@ export const buildApp = async () => {
   });
 
   await app.register(errorPlugin);
-  await app.register(authPlugin);
 
   await app.register(authRoutes, {
     prefix: '/api/v1/auth'
