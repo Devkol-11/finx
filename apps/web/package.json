@@ -8,6 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
+  "engines": {
+    "pnpm": ">=9.0.0",
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@hookform/resolvers": "5.2.2",
     "@radix-ui/react-dialog": "^1.1.15",
