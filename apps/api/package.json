@@ -16,6 +16,9 @@
     "db:studio": "prisma studio",
     "db:push": "prisma db push"
   },
+  "engines": {
+    "node": "22.x"
+  },
   "packageManager": "pnpm@10.30.0",
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
