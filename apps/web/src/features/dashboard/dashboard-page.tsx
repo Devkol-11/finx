@@ -99,33 +99,35 @@ export default function DashboardPage() {
       <TransferModal open={transferOpen} onClose={() => setTransferOpen(false)} />
 
       {/* ── Quick stats row ── */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="p-4">
-          <div className="flex items-center gap-2">
-            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
-              <TrendingUp className="h-3.5 w-3.5" />
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600 sm:h-7 sm:w-7">
+              <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             </div>
-            <p className="text-xs text-gray-500 leading-tight">Total deposited</p>
+            <p className="text-[10px] leading-tight text-gray-500 sm:text-xs">Total deposited</p>
           </div>
-          <p className="mt-2 truncate text-base font-bold text-gray-900">{formatMoney(totalDeposited.toString())}</p>
+          <p className="mt-1.5 truncate text-sm font-bold text-gray-900 sm:mt-2 sm:text-base">{formatMoney(totalDeposited.toString())}</p>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2">
-            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary-50 text-primary-600">
-              <PiggyBank className="h-3.5 w-3.5" />
+
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-primary-50 text-primary-600 sm:h-7 sm:w-7">
+              <PiggyBank className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             </div>
-            <p className="text-xs text-gray-500 leading-tight">Total saved</p>
+            <p className="text-[10px] leading-tight text-gray-500 sm:text-xs">Total saved</p>
           </div>
-          <p className="mt-2 truncate text-base font-bold text-gray-900">{formatMoney(savingsTotal.toString())}</p>
+          <p className="mt-1.5 truncate text-sm font-bold text-gray-900 sm:mt-2 sm:text-base">{formatMoney(savingsTotal.toString())}</p>
         </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2">
-            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600">
-              <ReceiptText className="h-3.5 w-3.5" />
+
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600 sm:h-7 sm:w-7">
+              <ReceiptText className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             </div>
-            <p className="text-xs text-gray-500 leading-tight">Transactions</p>
+            <p className="text-[10px] leading-tight text-gray-500 sm:text-xs">Transactions</p>
           </div>
-          <p className="mt-2 text-base font-bold text-gray-900">{txCount} recent</p>
+          <p className="mt-1.5 text-sm font-bold text-gray-900 sm:mt-2 sm:text-base">{txCount} recent</p>
         </Card>
       </div>
 

@@ -1,11 +1,11 @@
 import { useMutation } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';
-import { AlertCircle, BadgeCheck, ChevronDown, FileSearch, Lock, ShieldCheck, UserCheck } from 'lucide-react';
+import { AlertCircle, BadgeCheck, FileSearch, Lock, ShieldCheck, UserCheck } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/common/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input, Select } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { kycApi } from '@/features/kyc/api';
 import { useAppSelector } from '@/store/hooks';
 import { setKycVerified } from '@/store/auth-slice';
@@ -32,7 +32,6 @@ export default function KycPage() {
   });
 
   const wasAlreadyVerified = kycVerified && mutation.isSuccess && mutation.data?.alreadyVerified === true;
-
   const failed = mutation.isError;
 
   // ── Already verified screen ──
@@ -73,7 +72,7 @@ export default function KycPage() {
     );
   }
 
-  // ── Verified screen (fresh verify OR returning user loaded from Redux/localStorage) ──
+  // ── Verified screen ──
   if (kycVerified) {
     return (
       <div className="mx-auto max-w-2xl space-y-5">
@@ -161,12 +160,11 @@ export default function KycPage() {
         >
           <div>
             <p className="mb-3 text-sm font-semibold text-gray-700">Identity details</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="relative">
-                <Select className="w-full appearance-none pr-9" disabled>
-                  <option value="BVN">BVN — Bank Verification Number</option>
-                </Select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-blue-500" />
+                <span className="text-sm font-medium text-gray-600">BVN</span>
+                <span className="text-xs text-gray-400">— Bank Verification Number</span>
               </div>
               <Input
                 placeholder="Enter your 11-digit BVN"
