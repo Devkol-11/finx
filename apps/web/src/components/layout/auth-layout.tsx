@@ -1,5 +1,5 @@
-import { Outlet } from "react-router-dom";
-import { Brand } from "@/components/layout/sidebar";
+import { Outlet } from 'react-router-dom';
+import { Brand } from '@/components/layout/sidebar';
 
 export function AuthLayout() {
   return (
@@ -14,7 +14,7 @@ export function AuthLayout() {
           </p>
         </div>
         <div className="grid grid-cols-3 gap-3 text-sm">
-          {["Instant wallet", "Easy transfers", "Smart savings"].map((item) => (
+          {['Instant wallet', 'Easy transfers', 'Smart savings'].map((item) => (
             <div key={item} className="rounded-2xl bg-white/12 p-4 font-semibold backdrop-blur">
               {item}
             </div>
@@ -24,7 +24,7 @@ export function AuthLayout() {
       <section className="flex min-h-screen items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
           <div className="mb-8 lg:hidden">
-            <Brand />
+            <Brand onDark={true} />
           </div>
           <Outlet />
         </div>

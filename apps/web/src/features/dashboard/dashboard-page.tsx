@@ -31,7 +31,6 @@ export default function DashboardPage() {
   const activePlans = savings.data?.filter((p) => p.status === 'ACTIVE').length ?? 0;
   const txCount = balance.data?.recentActivity.length ?? 0;
 
-  // 🔍 This is where Total Deposited comes from - filters DEPOSIT transactions and sums amounts
   const totalDeposited = balance.data?.recentActivity.filter((t) => t.type === 'DEPOSIT').reduce((sum, t) => sum + Number(t.amount), 0) ?? 0;
 
   const handleCopy = () => {
@@ -59,7 +58,7 @@ export default function DashboardPage() {
         <p className="mt-0.5 text-sm text-gray-500">Here's what's happening with your Finx account today.</p>
       </div>
 
-      {/* ── Balance card + action buttons as one fused unit ── */}
+      {/* ── Balance card + action buttons ── */}
       <div className="overflow-hidden rounded-3xl shadow-[0_24px_60px_rgba(37,99,235,0.22)]">
         <div className="[&>div]:rounded-b-none [&>div]:shadow-none">
           <BalanceCard wallet={balance.data?.wallet} />
@@ -178,49 +177,28 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <div className="space-y-5">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base">Savings</CardTitle>
-              <Button asChild variant="ghost" size="sm">
-                <Link to="/app/savings">Open</Link>
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {savings.data?.[0] ? (
-                <>
-                  <SavingsCard plan={savings.data[0]} />
-                  {activePlans > 1 && (
-                    <p className="text-center text-xs text-gray-400">
-                      +{activePlans - 1} more active plan{activePlans - 1 > 1 ? 's' : ''}
-                    </p>
-                  )}
-                </>
-              ) : (
-                <EmptyState title="Start a plan" description="Create a savings pocket and fund it from your wallet." />
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary-50 text-primary-600">
-                <TrendingUp className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">Wallet rhythm</p>
-                <p className="mt-1 text-xs text-gray-500 leading-relaxed">
-                  Keep everyday spending in your wallet and move planned money into savings pockets when you're ready.
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button asChild variant="secondary" size="sm">
-                    <Link to="/app/savings">Open savings</Link>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base">Savings</CardTitle>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/app/savings">Open</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {savings.data?.[0] ? (
+              <>
+                <SavingsCard plan={savings.data[0]} />
+                {activePlans > 1 && (
+                  <p className="text-center text-xs text-gray-400">
+                    +{activePlans - 1} more active plan{activePlans - 1 > 1 ? 's' : ''}
+                  </p>
+                )}
+              </>
+            ) : (
+              <EmptyState title="Start a plan" description="Create a savings pocket and fund it from your wallet." />
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

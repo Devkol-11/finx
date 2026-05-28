@@ -35,13 +35,12 @@ export function AppShell() {
           <div className="mx-auto flex max-w-7xl items-center gap-3">
             {/* Brand - visible only on mobile */}
             <div className="xl:hidden">
-              <Brand />
+              <Brand onDark={false} />
             </div>
 
-            {/* FIX: ml-auto pushes this entire block to the far right */}
             <div className="ml-auto flex items-center gap-3">
-              {/* Settings button - mobile only */}
-              <Button asChild className="xl:hidden" size="icon" variant="ghost" aria-label="Open settings">
+              {/* Settings button - tablet only (hidden on mobile since MobileNav handles it) */}
+              <Button asChild className="hidden md:flex xl:hidden" size="icon" variant="ghost" aria-label="Open settings">
                 <Link to="/app/settings">
                   <Settings className="h-5 w-5" />
                 </Link>

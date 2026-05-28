@@ -35,11 +35,10 @@ export const authSlice = createSlice({
   initialState,
   reducers: {
     setSession: (state, action: PayloadAction<{ token: string; user: User; wallet?: Wallet }>) => {
-      console.log('[REDUCER PAYLOAD SHAPE : ]', action.payload);
       state.token = action.payload.token;
       state.user = action.payload.user;
       state.initialWallet = action.payload.wallet;
-        if (!state.user.avatarUrl) {
+      if (!state.user.avatarUrl) {
         state.user.avatarUrl = `https://api.dicebear.com/9.x/adventurer/svg?seed=${Math.random().toString(36).substring(2, 10)}`;
       }
       persist(state);
