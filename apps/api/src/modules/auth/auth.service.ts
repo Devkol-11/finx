@@ -78,11 +78,14 @@ export class AuthService {
         logger.info('[AUTH] queueing welcome email', {
           email: createdAccount.user.email
         });
-        await queuePublishEmail({
-          to: createdAccount.user.email,
-          subject,
-          body
-        });
+
+        if (appConfig.RUN_WORKERS) {
+          await queuePublishEmail({
+            to: createdAccount.user.email,
+            subject,
+            body
+          });
+        }
 
         logger.info('[AUTH] registration completed', {
           userId: createdAccount.user.id

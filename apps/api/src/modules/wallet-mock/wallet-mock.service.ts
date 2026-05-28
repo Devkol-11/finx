@@ -5,15 +5,15 @@ import { WalletMockRpository } from './wallet-mock.repository';
 import { verifyUserKycProfile } from './wallet-mock.helpers';
 import { queuePublishEmail } from '../pub-sub';
 import { EMAIL_TEMPLATES } from '../../utils/emailTemplates';
-import { getRedisApi } from '../../lib/redis';
-import Redis from 'ioredis';
-import { logInfo } from '../../utils/logger';
+// import { getRedisApi } from '../../lib/redis';
+// import Redis from 'ioredis';
+// import { logInfo } from '../../utils/logger';
 
 export class WalletMockService {
-  private cache!: Redis;
-  private readonly walletCacheKey;
+  // private cache!: Redis;
+  // private readonly walletCacheKey;
   constructor(private readonly walletMockRepo: WalletMockRpository) {
-    this.walletCacheKey = (userId: string) => `recent:wallet:activity:${userId}`;
+    // this.walletCacheKey = (userId: string) => `recent:wallet:activity:${userId}`;
   }
 
   public async getBalance(userId: string, input: BalanceQueryInput) {
