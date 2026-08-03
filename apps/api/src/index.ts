@@ -2,7 +2,7 @@ import { buildApp } from './app';
 import { appConfig } from './config/app.config';
 import { env } from './config/env';
 import { prisma } from './lib/prisma';
-import { connectRedis, disconnectRedis } from './lib/redis';
+import { connectRedis, disconnectRedis, isRedisReady } from './lib/redis';
 import { runProfileScript } from './scripts/profile';
 import { startWorkers } from './workers/worker-manager';
 
@@ -35,10 +35,14 @@ const bootstrap = async (): Promise<void> => {
     await prisma.$connect();
     app.log.info('Prisma database connection established.');
 
-    await connectRedis();
-    app.log.info('Redis connection established.');
+    try {
+      await connectRedis();
+      app.log.info('Redis connection established.');
+    } catch (redisError) {
+      app.log.warn({ err: redisError }, 'Redis unavailable — workers disabled. Set REDIS_URL to re-enable.');
+    }
 
-    if (appConfig.RUN_WORKERS) {
+    if (appConfig.RUN_WORKERS && isRedisReady()) {
       await startWorkers();
     }
 
