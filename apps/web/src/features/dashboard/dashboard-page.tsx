@@ -1,8 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ArrowDownToLine, CheckCheck, Copy, PiggyBank, ReceiptText, Send, TrendingUp } from 'lucide-react';
+import {
+  ArrowDownToLine,
+  CheckCheck,
+  Clock,
+  Copy,
+  PiggyBank,
+  ReceiptText,
+  Send,
+  TrendingUp,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
+import { motion } from 'framer-motion';
 import { BalanceCard, SavingsCard, TransactionCard } from '@/components/common/cards';
 import { EmptyState, ErrorState, PageSkeleton } from '@/components/common/states';
 import { Button } from '@/components/ui/button';
@@ -14,6 +24,32 @@ import { TransferModal } from '@/features/wallet/transfers-modal';
 import { formatMoney } from '@/lib/utils';
 import { useUiStore } from '@/store/ui-store';
 import type { RootState } from '@/store';
+
+const EASE_OUT = [0.23, 1, 0.32, 1] as const;
+
+const containerVariants = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.06 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, scale: 0.95, y: 6 },
+  show: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: { duration: 0.28, ease: EASE_OUT },
+  },
+};
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default function DashboardPage() {
   const user = useSelector((state: RootState) => state.auth.user);
@@ -27,11 +63,15 @@ export default function DashboardPage() {
   if (balance.isLoading) return <PageSkeleton />;
   if (balance.isError) return <ErrorState onRetry={() => balance.refetch()} />;
 
-  const savingsTotal = savings.data?.reduce((sum, plan) => sum + Number(plan.currentAmount), 0) ?? 0;
+  const savingsTotal =
+    savings.data?.reduce((sum, plan) => sum + Number(plan.currentAmount), 0) ?? 0;
   const activePlans = savings.data?.filter((p) => p.status === 'ACTIVE').length ?? 0;
   const txCount = balance.data?.recentActivity.length ?? 0;
 
-  const totalDeposited = balance.data?.recentActivity.filter((t) => t.type === 'DEPOSIT').reduce((sum, t) => sum + Number(t.amount), 0) ?? 0;
+  const totalDeposited =
+    balance.data?.recentActivity
+      .filter((t) => t.type === 'DEPOSIT')
+      .reduce((sum, t) => sum + Number(t.amount), 0) ?? 0;
 
   const handleCopy = () => {
     if (!user?.finxTag) return;
@@ -41,167 +81,249 @@ export default function DashboardPage() {
     });
   };
 
-  const greeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
+  const quickActions = [
+    {
+      icon: Send,
+      label: 'Send',
+      sublabel: 'Via FinxTag',
+      onClick: () => setTransferOpen(true),
+      color: 'bg-blue-600',
+    },
+    {
+      icon: ArrowDownToLine,
+      label: 'Deposit',
+      sublabel: 'Add funds',
+      onClick: () => setDepositOpen(true),
+      color: 'bg-emerald-600',
+    },
+    {
+      icon: PiggyBank,
+      label: 'Savings',
+      sublabel: 'Grow money',
+      to: '/app/savings',
+      color: 'bg-slate-800',
+    },
+    {
+      icon: Clock,
+      label: 'History',
+      sublabel: 'All activity',
+      to: '/app/transactions',
+      color: 'bg-slate-600',
+    },
+  ];
 
   return (
-    <div className="space-y-5">
-      {/* ── Greeting ── */}
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">
-          {greeting()}, {user?.firstName ?? 'there'} 👋
+    <motion.div
+      className="space-y-5"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+    >
+      {/* Greeting */}
+      <motion.div variants={itemVariants}>
+        <h1
+          className="text-xl font-bold text-slate-900"
+          style={{ letterSpacing: '-0.02em' }}
+        >
+          {greeting()}, {user?.firstName ?? 'there'}
         </h1>
-        <p className="mt-0.5 text-sm text-gray-500">Here's what's happening with your Finx account today.</p>
-      </div>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Here's what's happening with your Finx account.
+        </p>
+      </motion.div>
 
-      {/* ── Balance card + action buttons ── */}
-      <div className="overflow-hidden rounded-3xl shadow-[0_24px_60px_rgba(37,99,235,0.22)]">
-        <div className="[&>div]:rounded-b-none [&>div]:shadow-none">
-          <BalanceCard wallet={balance.data?.wallet} />
-        </div>
-        <div className="grid grid-cols-2 divide-x divide-white/15 bg-gradient-to-br from-blue-800 to-cyan-600">
-          <button
-            type="button"
-            onClick={() => setDepositOpen(true)}
-            className="group flex items-center justify-center gap-2.5 px-5 py-4 transition-all duration-200 hover:bg-white/10 active:bg-white/20"
-          >
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 backdrop-blur-sm transition-colors group-hover:bg-white/25">
-              <ArrowDownToLine className="h-4 w-4 text-white" />
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-semibold text-white">Deposit</p>
-              <p className="text-[11px] text-blue-100/70">Add funds</p>
-            </div>
-          </button>
+      {/* Balance card */}
+      <motion.div variants={itemVariants}>
+        <BalanceCard wallet={balance.data?.wallet} />
+      </motion.div>
 
-          <button
-            type="button"
-            onClick={() => setTransferOpen(true)}
-            className="group flex items-center justify-center gap-2.5 px-5 py-4 transition-all duration-200 hover:bg-white/10 active:bg-white/20"
-          >
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/15 backdrop-blur-sm transition-colors group-hover:bg-white/25">
-              <Send className="h-4 w-4 text-white" />
+      {/* 4-button quick actions */}
+      <motion.div
+        className="grid grid-cols-4 gap-2 sm:gap-3"
+        variants={containerVariants}
+      >
+        {quickActions.map(({ icon: Icon, label, sublabel, onClick, to, color }) => {
+          const inner = (
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div
+                className={`grid h-11 w-11 place-items-center rounded-2xl ${color} text-white shadow-sm transition-transform duration-[140ms] active:scale-[0.93]`}
+              >
+                <Icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-800">{label}</p>
+                <p className="text-[10px] text-slate-500">{sublabel}</p>
+              </div>
             </div>
-            <div className="text-left">
-              <p className="text-sm font-semibold text-white">Transfer</p>
-              <p className="text-[11px] text-blue-100/70">Send via FinxTag</p>
-            </div>
-          </button>
-        </div>
-      </div>
+          );
 
-      {/* ── Modals ── */}
+          return (
+            <motion.div key={label} variants={itemVariants}>
+              {to ? (
+                <Link
+                  to={to}
+                  className="flex flex-col items-center rounded-2xl border border-slate-100 bg-white p-3.5 transition-all duration-[140ms] hover:border-slate-200 hover:shadow-[0_2px_12px_rgba(15,23,42,0.08)] active:scale-[0.97] sm:p-4"
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onClick}
+                  className="flex w-full flex-col items-center rounded-2xl border border-slate-100 bg-white p-3.5 transition-all duration-[140ms] hover:border-slate-200 hover:shadow-[0_2px_12px_rgba(15,23,42,0.08)] active:scale-[0.97] sm:p-4"
+                >
+                  {inner}
+                </button>
+              )}
+            </motion.div>
+          );
+        })}
+      </motion.div>
+
+      {/* Modals */}
       <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
       <TransferModal open={transferOpen} onClose={() => setTransferOpen(false)} />
 
-      {/* ── Quick stats row ── */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <Card className="p-3 sm:p-4">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600 sm:h-7 sm:w-7">
-              <TrendingUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+      {/* Quick stats row */}
+      <motion.div className="grid grid-cols-3 gap-2 sm:gap-3" variants={containerVariants}>
+        {[
+          {
+            icon: TrendingUp,
+            iconBg: 'bg-emerald-50 text-emerald-600',
+            label: 'Total deposited',
+            value: formatMoney(totalDeposited.toString()),
+          },
+          {
+            icon: PiggyBank,
+            iconBg: 'bg-slate-100 text-slate-700',
+            label: 'Total saved',
+            value: formatMoney(savingsTotal.toString()),
+          },
+          {
+            icon: ReceiptText,
+            iconBg: 'bg-blue-50 text-blue-600',
+            label: 'Transactions',
+            value: `${txCount} recent`,
+          },
+        ].map(({ icon: Icon, iconBg, label, value }) => (
+          <motion.div key={label} variants={itemVariants}>
+            <Card className="p-3 sm:p-4">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-xl ${iconBg}`}>
+                  <Icon className="h-3.5 w-3.5" />
+                </div>
+                <p className="text-[10px] leading-tight text-slate-500 sm:text-xs">{label}</p>
+              </div>
+              <p
+                className="mt-2 truncate text-sm font-bold text-slate-900 sm:text-base"
+                style={{ fontVariantNumeric: 'tabular-nums' }}
+              >
+                {value}
+              </p>
+            </Card>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* FinxTag share strip */}
+      <motion.div variants={itemVariants}>
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">Your FinxTag</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Share it so friends can send you money instantly.
+              </p>
+              <p
+                className="mt-2 font-mono text-sm font-bold text-blue-600"
+                style={{ fontVariantNumeric: 'tabular-nums' }}
+              >
+                @{user?.finxTag ?? '---'}
+              </p>
             </div>
-            <p className="text-[10px] leading-tight text-gray-500 sm:text-xs">Total deposited</p>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition-all duration-[140ms] hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600 active:scale-[0.96]"
+            >
+              {copied ? (
+                <>
+                  <CheckCheck className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="text-emerald-600">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Copy tag</span>
+                </>
+              )}
+            </button>
           </div>
-          <p className="mt-1.5 truncate text-sm font-bold text-gray-900 sm:mt-2 sm:text-base">{formatMoney(totalDeposited.toString())}</p>
         </Card>
+      </motion.div>
 
-        <Card className="p-3 sm:p-4">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-primary-50 text-primary-600 sm:h-7 sm:w-7">
-              <PiggyBank className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            </div>
-            <p className="text-[10px] leading-tight text-gray-500 sm:text-xs">Total saved</p>
-          </div>
-          <p className="mt-1.5 truncate text-sm font-bold text-gray-900 sm:mt-2 sm:text-base">{formatMoney(savingsTotal.toString())}</p>
-        </Card>
+      {/* Main content grid */}
+      <motion.div
+        className="grid gap-5 lg:grid-cols-[1fr_0.85fr]"
+        variants={containerVariants}
+      >
+        <motion.div variants={itemVariants}>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base">Recent activity</CardTitle>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/app/transactions">View all</Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {balance.data?.recentActivity.length ? (
+                balance.data.recentActivity
+                  .slice(0, 5)
+                  .map((item) => (
+                    <TransactionCard
+                      key={item.id}
+                      transaction={item}
+                      onClick={() => setSelectedTransaction(item)}
+                    />
+                  ))
+              ) : (
+                <EmptyState
+                  title="No activity yet"
+                  description="Your deposits, transfers, and savings payouts will appear here."
+                />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        <Card className="p-3 sm:p-4">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600 sm:h-7 sm:w-7">
-              <ReceiptText className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            </div>
-            <p className="text-[10px] leading-tight text-gray-500 sm:text-xs">Transactions</p>
-          </div>
-          <p className="mt-1.5 text-sm font-bold text-gray-900 sm:mt-2 sm:text-base">{txCount} recent</p>
-        </Card>
-      </div>
-
-      {/* ── FinxTag share strip ── */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-gray-900">Share your FinxTag</p>
-            <p className="mt-0.5 text-xs text-gray-500">Let friends send you money instantly — no account number needed.</p>
-            <p className="mt-2 font-mono text-sm font-bold text-primary-600">@{user?.finxTag ?? '---'}</p>
-          </div>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="flex shrink-0 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-semibold text-gray-700 shadow-sm transition-all duration-150 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600 active:scale-95"
-          >
-            {copied ? (
-              <>
-                <CheckCheck className="h-3.5 w-3.5 text-emerald-500" />
-                <span className="text-emerald-600">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="h-3.5 w-3.5" />
-                <span>Copy tag</span>
-              </>
-            )}
-          </button>
-        </div>
-      </Card>
-
-      {/* ── Main content grid ── */}
-      <div className="grid gap-5 lg:grid-cols-[1fr_0.85fr]">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">Recent activity</CardTitle>
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/app/transactions">View all</Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {balance.data?.recentActivity.length ? (
-              balance.data.recentActivity
-                .slice(0, 5)
-                .map((item) => <TransactionCard key={item.id} transaction={item} onClick={() => setSelectedTransaction(item)} />)
-            ) : (
-              <EmptyState title="No activity yet" description="Your deposits, transfers, and savings payouts will appear here." />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">Savings</CardTitle>
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/app/savings">Open</Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {savings.data?.[0] ? (
-              <>
-                <SavingsCard plan={savings.data[0]} />
-                {activePlans > 1 && (
-                  <p className="text-center text-xs text-gray-400">
-                    +{activePlans - 1} more active plan{activePlans - 1 > 1 ? 's' : ''}
-                  </p>
-                )}
-              </>
-            ) : (
-              <EmptyState title="Start a plan" description="Create a savings pocket and fund it from your wallet." />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+        <motion.div variants={itemVariants}>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base">Savings</CardTitle>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/app/savings">Open</Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {savings.data?.[0] ? (
+                <>
+                  <SavingsCard plan={savings.data[0]} />
+                  {activePlans > 1 && (
+                    <p className="text-center text-xs text-slate-400">
+                      +{activePlans - 1} more active plan{activePlans - 1 > 1 ? 's' : ''}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <EmptyState
+                  title="Start a plan"
+                  description="Create a savings pocket and fund it from your wallet."
+                />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }

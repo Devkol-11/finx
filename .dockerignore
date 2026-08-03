@@ -1,0 +1,34 @@
+# ── Node modules ─────────────────────────────────────────────────────────────
+**/node_modules
+
+# ── Build artifacts ───────────────────────────────────────────────────────────
+**/dist
+
+# ── Environment files (injected via docker-compose env_file) ──────────────────
+**/.env
+**/.env.local
+!**/.env.example
+!**/.env.docker.example
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+**/logs
+**/*.log
+
+# ── Web app (not needed for API image) ────────────────────────────────────────
+apps/web/src
+apps/web/public
+apps/web/index.html
+apps/web/vite.config.*
+apps/web/tailwind.config.*
+
+# ── Git and tooling ───────────────────────────────────────────────────────────
+.git
+.gitignore
+.github
+.vscode
+.claude
+
+# ── Misc ─────────────────────────────────────────────────────────────────────
+**/.DS_Store
+**/coverage
+**/README.md

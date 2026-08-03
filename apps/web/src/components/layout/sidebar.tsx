@@ -18,19 +18,33 @@ export function Brand({ onDark = false }: { onDark?: boolean }) {
       <div
         className={cn(
           'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]',
-          onDark ? 'bg-white/20 ring-1 ring-white/30' : 'bg-blue-600 shadow-md shadow-blue-200'
+          onDark
+            ? 'bg-white/20 ring-1 ring-white/25'
+            : 'bg-gradient-to-b from-blue-500 to-blue-600 shadow-[0_4px_12px_rgba(37,99,235,0.35)]'
         )}
       >
-        <span className={cn('text-[13px] font-black tracking-tight', onDark ? 'text-white' : 'text-white')}>FX</span>
+        <span className="text-[13px] font-black tracking-tight text-white">FX</span>
       </div>
 
       <div className="flex flex-col gap-0.5">
-        <span className={cn('text-[17px] font-black leading-none tracking-[-0.03em]', onDark ? 'text-white' : 'text-slate-900')}>Finx</span>
-        <div className="flex items-center gap-1.5">
-          <span className={cn('text-[10px] font-bold uppercase tracking-[0.14em]', onDark ? 'text-white/60' : 'text-slate-400')}>
-            Wallet & Savings
-          </span>
-        </div>
+        <span
+          className={cn(
+            'text-[17px] font-black leading-none',
+            onDark ? 'text-white' : 'text-slate-900'
+          )}
+          style={{ letterSpacing: '-0.03em' }}
+        >
+          Finx
+        </span>
+        <span
+          className={cn(
+            'text-[10px] font-bold uppercase',
+            onDark ? 'text-white/55' : 'text-slate-400'
+          )}
+          style={{ letterSpacing: '0.14em' }}
+        >
+          Wallet &amp; Savings
+        </span>
       </div>
     </div>
   );
@@ -39,34 +53,49 @@ export function Brand({ onDark = false }: { onDark?: boolean }) {
 export function Sidebar() {
   const dispatch = useAppDispatch();
   return (
-    <aside className="hidden h-screen w-72 shrink-0 border-r border-slate-200/80 bg-white/80 p-5 backdrop-blur xl:sticky xl:top-0 xl:block">
+    <aside className="hidden h-screen w-72 shrink-0 border-r border-slate-200/60 bg-white/90 p-5 backdrop-blur-xl xl:sticky xl:top-0 xl:flex xl:flex-col">
       <Brand onDark={false} />
 
-      <nav className="mt-9 space-y-1">
+      <nav className="mt-8 flex-1 space-y-1">
         {nav.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition',
-                isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
+                'flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold transition-all duration-[140ms]',
+                isActive
+                  ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-[0_4px_16px_rgba(37,99,235,0.32)]'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
               )
             }
           >
-            <item.icon className="h-5 w-5" />
+            <item.icon className="h-5 w-5 shrink-0" />
             {item.label}
           </NavLink>
         ))}
       </nav>
 
-      <div className="mt-8 rounded-3xl bg-blue-950 p-5 text-white">
-        <Landmark className="h-5 w-5 text-cyan-200" />
-        <p className="mt-3 text-sm font-semibold">Finx works best when your wallet stays funded.</p>
-        <p className="mt-1 text-xs text-blue-100">Deposits, transfers, and savings stay in one clean ledger.</p>
+      <div className="rounded-3xl overflow-hidden">
+        <div
+          className="p-5 text-white"
+          style={{
+            background: 'linear-gradient(135deg, #0a1f5c 0%, #1347d4 60%, #0693bf 100%)',
+          }}
+        >
+          <div className="grid h-8 w-8 place-items-center rounded-xl bg-white/15 backdrop-blur-sm">
+            <Landmark className="h-4 w-4 text-cyan-200" />
+          </div>
+          <p className="mt-3 text-sm font-semibold leading-snug">
+            Keep your wallet topped up for instant transfers.
+          </p>
+          <p className="mt-1.5 text-xs text-blue-100/70">
+            Deposits, transfers, and savings in one clean ledger.
+          </p>
+        </div>
       </div>
 
-      <Button className="mt-6 w-full" variant="ghost" onClick={() => dispatch(clearSession())}>
+      <Button className="mt-4 w-full" variant="ghost" onClick={() => dispatch(clearSession())}>
         <LogOut className="h-4 w-4" />
         Log out
       </Button>

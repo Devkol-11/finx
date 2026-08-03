@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowRight } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,34 +21,31 @@ const schema = z.object({
 export default function LoginPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const location = useLocation();
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
   });
+
   const mutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: ({ data }) => {
-      dispatch(
-        setSession({
-          token: data.accessToken,
-          user: data.user,
-        })
-      );
-      console.log('[SUCCESS]', data);
-      console.log('NAVIGATING');
-      // navigate((location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/app/dashboard", { replace: true });
+      dispatch(setSession({ token: data.accessToken, user: data.user }));
       navigate('/app/dashboard', { replace: true });
-      // navigate('/app/dashboard');
     },
   });
 
   return (
     <Card className="p-6">
-      <h1 className="text-2xl font-semibold text-slate-950">Welcome back</h1>
+      <h1
+        className="text-2xl font-semibold text-slate-950"
+        style={{ letterSpacing: '-0.025em' }}
+      >
+        Welcome back
+      </h1>
       <p className="mt-1 text-sm text-slate-500">
         Sign in to manage your wallet, savings, and transfers.
       </p>
+
       <form
         className="mt-6 space-y-4"
         onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
@@ -64,21 +61,24 @@ export default function LoginPage() {
             {...form.register('password')}
           />
         </FormField>
-        {mutation.isError ? (
-          <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
+
+        {mutation.isError && (
+          <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
             {apiMessage(mutation.error)}
-          </p>
-        ) : null}
+          </div>
+        )}
+
         <Button className="w-full" disabled={mutation.isPending}>
           {mutation.isPending ? 'Signing in...' : 'Sign in'}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </form>
+
       <div className="mt-5 flex items-center justify-between text-sm">
-        <Link className="font-semibold text-blue-700" to="/auth/register">
+        <Link className="font-semibold text-blue-600 hover:text-blue-700" to="/auth/register">
           Create account
         </Link>
-        <Link className="text-slate-500 hover:text-blue-700" to="/auth/forgot-password">
+        <Link className="text-slate-500 hover:text-blue-600" to="/auth/forgot-password">
           Forgot password?
         </Link>
       </div>

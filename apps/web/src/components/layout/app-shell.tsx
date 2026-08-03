@@ -1,4 +1,4 @@
-import { Settings } from 'lucide-react';
+import { Bell, Settings } from 'lucide-react';
 import { Link, Outlet } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -18,7 +18,7 @@ export function AppShell() {
     queryKey: ['kyc', 'status'],
     queryFn: kycApi.getStatus,
     enabled: !!user,
-    staleTime: Infinity
+    staleTime: Infinity,
   });
 
   useEffect(() => {
@@ -31,25 +31,39 @@ export function AppShell() {
     <div className="min-h-screen xl:flex">
       <Sidebar />
       <div className="min-w-0 flex-1 pb-24 xl:pb-0">
-        <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/80 px-4 py-3 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-30 border-b border-slate-200/60 bg-white/85 px-4 py-3 backdrop-blur-xl lg:px-8">
           <div className="mx-auto flex max-w-7xl items-center gap-3">
-            {/* Brand - visible only on mobile */}
             <div className="xl:hidden">
               <Brand onDark={false} />
             </div>
 
-            <div className="ml-auto flex items-center gap-3">
-              {/* Settings button - tablet only (hidden on mobile since MobileNav handles it) */}
-              <Button asChild className="hidden md:flex xl:hidden" size="icon" variant="ghost" aria-label="Open settings">
+            <div className="ml-auto flex items-center gap-2">
+              {/* Bell icon */}
+              <button
+                type="button"
+                aria-label="Notifications"
+                className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 transition-all duration-[140ms] hover:bg-slate-100 hover:text-slate-800 active:scale-[0.95]"
+              >
+                <Bell className="h-4.5 w-4.5 h-[18px] w-[18px]" />
+              </button>
+
+              {/* Settings — tablet only */}
+              <Button
+                asChild
+                className="hidden md:flex xl:hidden"
+                size="icon"
+                variant="ghost"
+                aria-label="Open settings"
+              >
                 <Link to="/app/settings">
                   <Settings className="h-5 w-5" />
                 </Link>
               </Button>
 
-              {/* User profile - hidden on mobile, visible on md+ */}
+              {/* User profile — md+ only */}
               <div className="hidden items-center gap-3 md:flex">
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-slate-950">
+                  <p className="text-sm font-semibold text-slate-950" style={{ letterSpacing: '-0.01em' }}>
                     {user?.firstName} {user?.lastName}
                   </p>
                   <p className="text-xs text-slate-500">@{user?.finxTag}</p>
@@ -58,10 +72,15 @@ export function AppShell() {
                   <img
                     src={user.avatarUrl}
                     alt={`${user.firstName} ${user.lastName}`}
-                    className="h-10 w-10 rounded-2xl bg-primary-50 object-cover ring-2 ring-slate-100"
+                    className="h-10 w-10 rounded-2xl object-cover ring-2 ring-slate-100"
                   />
                 ) : (
-                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-primary-50 text-sm font-bold text-primary-700">
+                  <div
+                    className="grid h-10 w-10 place-items-center rounded-2xl text-sm font-bold text-white shadow-[0_2px_8px_rgba(37,99,235,0.25)]"
+                    style={{
+                      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    }}
+                  >
                     {initials(user?.firstName, user?.lastName)}
                   </div>
                 )}

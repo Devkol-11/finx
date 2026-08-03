@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, CalendarClock, LockKeyhole, PiggyBank, Plus, Sparkles, Target, TrendingUp, Zap } from 'lucide-react';
+import { AlertCircle, CalendarClock, LockKeyhole, PiggyBank, Plus, Target, TrendingUp, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
@@ -29,22 +29,22 @@ const planTypeConfig: Record<string, PlanTypeConfig> = {
     label: 'Flexible',
     description: 'Deposit and withdraw anytime, no restrictions',
     gradient: 'from-emerald-500 to-teal-500',
-    iconBg: 'bg-emerald-50 text-emerald-600'
+    iconBg: 'bg-emerald-50 text-emerald-600',
   },
   LOCKED: {
     icon: LockKeyhole,
     label: 'Locked',
     description: 'Commit funds until a set unlock date',
     gradient: 'from-rose-500 to-orange-400',
-    iconBg: 'bg-rose-50 text-rose-600'
+    iconBg: 'bg-rose-50 text-rose-600',
   },
   TARGET: {
     icon: Target,
     label: 'Target',
     description: 'Save toward a specific financial goal',
     gradient: 'from-blue-600 to-cyan-500',
-    iconBg: 'bg-blue-50 text-blue-600'
-  }
+    iconBg: 'bg-blue-50 text-blue-600',
+  },
 };
 
 const PLAN_TYPES: SavingsPlanType[] = ['FLEXIBLE', 'LOCKED', 'TARGET'];
@@ -56,50 +56,55 @@ const schema = z
     description: z.string().max(500).optional(),
     targetAmount: z.string().optional(),
     unlockDate: z.string().optional(),
-    locked: z.boolean().optional()
+    locked: z.boolean().optional(),
   })
   .refine((d) => d.type !== 'TARGET' || !!d.targetAmount, {
     path: ['targetAmount'],
-    message: 'Target amount is required for TARGET plans.'
+    message: 'Target amount is required for TARGET plans.',
   })
   .refine((d) => d.type !== 'LOCKED' || !!d.unlockDate, {
     path: ['unlockDate'],
-    message: 'Unlock date is required for LOCKED plans.'
+    message: 'Unlock date is required for LOCKED plans.',
   });
 
 type FormValues = z.infer<typeof schema>;
+
+const statusColors: Record<string, string> = {
+  ACTIVE: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60',
+  MATURED: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200/60',
+  CANCELLED: 'bg-rose-50 text-rose-600 ring-1 ring-rose-200/60',
+  PAUSED: 'bg-slate-100 text-slate-600',
+};
 
 function PlanCard({ plan }: { plan: SavingsPlan }) {
   const config = planTypeConfig[plan.type] ?? planTypeConfig['FLEXIBLE'];
   const Icon = config.icon;
 
-  // 🔥 FIX: Safe number conversion with NaN guard
   const currentAmountNum = (() => {
-    const num = parseFloat(plan.currentAmount);
-    return isNaN(num) ? 0 : num;
+    const n = parseFloat(plan.currentAmount);
+    return isNaN(n) ? 0 : n;
   })();
 
   const targetAmountNum = (() => {
     if (!plan.targetAmount) return null;
-    const num = parseFloat(plan.targetAmount);
-    return isNaN(num) ? null : num;
+    const n = parseFloat(plan.targetAmount);
+    return isNaN(n) ? null : n;
   })();
 
-  const progress = targetAmountNum !== null && targetAmountNum > 0 ? Math.min(100, Math.round((currentAmountNum / targetAmountNum) * 100)) : null;
+  const progress =
+    targetAmountNum !== null && targetAmountNum > 0
+      ? Math.min(100, Math.round((currentAmountNum / targetAmountNum) * 100))
+      : null;
 
-  const statusColors: Record<string, string> = {
-    ACTIVE: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    MATURED: 'bg-blue-50 text-blue-600 border-blue-100',
-    CANCELLED: 'bg-red-50 text-red-500 border-red-100',
-    PAUSED: 'bg-gray-100 text-gray-500 border-gray-200'
-  };
+  const statusLabel = plan.status.charAt(0) + plan.status.slice(1).toLowerCase();
 
   return (
     <Link
       to={`/app/savings/${plan.id}`}
-      className="group relative block overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-gray-300 hover:shadow-lg"
+      className="group relative block overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.05)] transition-all duration-[180ms] hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_8px_24px_rgba(15,23,42,0.10)] active:scale-[0.98]"
     >
-      <div className={`h-1.5 w-full bg-gradient-to-r ${config.gradient}`} />
+      {/* Gradient top strip */}
+      <div className={`h-1 w-full bg-gradient-to-r ${config.gradient}`} />
       <div className="p-5">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
@@ -107,34 +112,41 @@ function PlanCard({ plan }: { plan: SavingsPlan }) {
               <Icon className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm font-bold text-gray-900">{plan.name}</p>
-              {plan.description && <p className="mt-0.5 line-clamp-1 text-xs text-gray-400">{plan.description}</p>}
+              <p className="text-sm font-bold text-slate-900">{plan.name}</p>
+              {plan.description && (
+                <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{plan.description}</p>
+              )}
             </div>
           </div>
-          <span
-            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
-              statusColors[plan.status] ?? 'bg-gray-100 text-gray-500 border-gray-200'
-            }`}
-          >
-            {plan.status}
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColors[plan.status] ?? 'bg-slate-100 text-slate-600'}`}>
+            {statusLabel}
           </span>
         </div>
 
         <div className="mt-5">
-          <p className="text-xs font-medium uppercase tracking-widest text-gray-400">{plan.type === 'TARGET' ? 'Saved so far' : 'Balance'}</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{formatMoney(plan.currentAmount)}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+            {plan.type === 'TARGET' ? 'Saved so far' : 'Balance'}
+          </p>
+          <p
+            className="mt-1 text-2xl font-bold text-slate-900"
+            style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}
+          >
+            {formatMoney(plan.currentAmount)}
+          </p>
           {plan.targetAmount && targetAmountNum !== null && targetAmountNum > 0 && (
-            <p className="mt-0.5 text-xs text-gray-400">of {formatMoney(plan.targetAmount)} goal</p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              of {formatMoney(plan.targetAmount)} goal
+            </p>
           )}
         </div>
 
         {progress !== null && (
           <div className="mt-4">
-            <div className="flex items-center justify-between text-xs text-gray-400">
+            <div className="flex items-center justify-between text-xs text-slate-400">
               <span>{progress}% complete</span>
               <span>{100 - progress}% remaining</span>
             </div>
-            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-gray-100">
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
                 className={`h-full rounded-full bg-gradient-to-r ${config.gradient} transition-all duration-700`}
                 style={{ width: `${progress}%` }}
@@ -144,14 +156,14 @@ function PlanCard({ plan }: { plan: SavingsPlan }) {
         )}
 
         {plan.unlockDate && (
-          <div className="mt-4 flex items-center gap-1.5 rounded-xl bg-gray-50 px-3 py-2">
-            <CalendarClock className="h-3.5 w-3.5 text-gray-400" />
-            <span className="text-xs text-gray-500">
+          <div className="mt-4 flex items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-2">
+            <CalendarClock className="h-3.5 w-3.5 text-slate-400" />
+            <span className="text-xs text-slate-500">
               Unlocks{' '}
               {new Date(plan.unlockDate).toLocaleDateString('en-NG', {
                 day: 'numeric',
                 month: 'short',
-                year: 'numeric'
+                year: 'numeric',
               })}
             </span>
           </div>
@@ -166,14 +178,11 @@ export default function SavingsPage() {
   const [selectedType, setSelectedType] = useState<SavingsPlanType>('FLEXIBLE');
   const queryClient = useQueryClient();
 
-  const plans = useQuery({
-    queryKey: ['savings', 'plans'],
-    queryFn: savingsApi.listPlans
-  });
+  const plans = useQuery({ queryKey: ['savings', 'plans'], queryFn: savingsApi.listPlans });
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { type: 'FLEXIBLE', name: '', description: '' }
+    defaultValues: { type: 'FLEXIBLE', name: '', description: '' },
   });
 
   const mutation = useMutation({
@@ -182,53 +191,46 @@ export default function SavingsPage() {
         ...values,
         currency: 'NGN',
         type: values.type as SavingsPlanType,
-        unlockDate: values.unlockDate ? new Date(values.unlockDate).toISOString() : undefined
+        unlockDate: values.unlockDate ? new Date(values.unlockDate).toISOString() : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['savings', 'plans'] });
       setOpen(false);
       form.reset();
       setSelectedType('FLEXIBLE');
-    }
+    },
   });
 
   if (plans.isLoading) return <PageSkeleton />;
   if (plans.isError) return <ErrorState onRetry={() => plans.refetch()} />;
 
-  // 🔥 FIX: Safe totalSaved calculation with NaN guard
   const totalSaved = (() => {
     if (!plans.data?.length) return 0;
     return plans.data.reduce((sum, p) => {
-      const amount = parseFloat(p.currentAmount);
-      return sum + (isNaN(amount) ? 0 : amount);
+      const n = parseFloat(p.currentAmount);
+      return sum + (isNaN(n) ? 0 : n);
     }, 0);
   })();
 
   const activePlans = plans.data?.filter((p) => p.status === 'ACTIVE').length ?? 0;
   const targetPlans = plans.data?.filter((p) => p.type === 'TARGET') ?? [];
 
-  // 🔥 FIX: Safe overallProgress calculation - no division by zero, no NaN
   const overallProgress = (() => {
     if (targetPlans.length === 0) return null;
-
-    let validProgressSum = 0;
-    let validPlanCount = 0;
-
+    let sum = 0;
+    let count = 0;
     for (const p of targetPlans) {
       if (p.targetAmount) {
         const current = parseFloat(p.currentAmount);
         const target = parseFloat(p.targetAmount);
-
         if (!isNaN(current) && !isNaN(target) && target > 0) {
-          const pct = (current / target) * 100;
-          validProgressSum += pct;
-          validPlanCount++;
+          sum += (current / target) * 100;
+          count++;
         }
       }
     }
-
-    if (validPlanCount === 0) return null;
-    return Math.round(validProgressSum / validPlanCount);
+    if (count === 0) return null;
+    return Math.round(sum / count);
   })();
 
   return (
@@ -245,30 +247,44 @@ export default function SavingsPage() {
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 p-4 text-white">
-          <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
-          <div className="grid h-8 w-8 place-items-center rounded-xl bg-white/20">
-            <PiggyBank className="h-4 w-4" />
+        {[
+          {
+            icon: PiggyBank,
+            label: 'Total saved',
+            value: formatMoney(totalSaved.toString()),
+            style: { background: 'linear-gradient(135deg, #0a1f5c 0%, #1347d4 60%, #0693bf 100%)' },
+          },
+          {
+            icon: TrendingUp,
+            label: 'Active plans',
+            value: String(activePlans),
+            style: { background: 'linear-gradient(135deg, #059669, #0d9488)' },
+          },
+          {
+            icon: Target,
+            label: 'Goal progress',
+            value: overallProgress !== null ? `${overallProgress}%` : '--',
+            style: { background: 'linear-gradient(135deg, #475569, #1e293b)' },
+          },
+        ].map(({ icon: Icon, label, value, style }) => (
+          <div
+            key={label}
+            className="relative overflow-hidden rounded-2xl p-4 text-white"
+            style={style}
+          >
+            <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-white/20">
+              <Icon className="h-4 w-4" />
+            </div>
+            <p className="mt-3 text-xs font-medium text-white/70">{label}</p>
+            <p
+              className="mt-0.5 truncate text-lg font-bold"
+              style={{ fontVariantNumeric: 'tabular-nums' }}
+            >
+              {value}
+            </p>
           </div>
-          <p className="mt-3 text-xs font-medium text-blue-100">Total saved</p>
-          <p className="mt-0.5 truncate text-lg font-bold">{formatMoney(totalSaved.toString())}</p>
-        </div>
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 p-4 text-white">
-          <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
-          <div className="grid h-8 w-8 place-items-center rounded-xl bg-white/20">
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <p className="mt-3 text-xs font-medium text-emerald-100">Active plans</p>
-          <p className="mt-0.5 text-lg font-bold">{activePlans}</p>
-        </div>
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 p-4 text-white">
-          <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/10" />
-          <div className="grid h-8 w-8 place-items-center rounded-xl bg-white/20">
-            <TrendingUp className="h-4 w-4" />
-          </div>
-          <p className="mt-3 text-xs font-medium text-purple-100">Goal progress</p>
-          <p className="mt-0.5 text-lg font-bold">{overallProgress !== null ? `${overallProgress}%` : '—'}</p>
-        </div>
+        ))}
       </div>
 
       {/* Plans grid */}
@@ -280,17 +296,30 @@ export default function SavingsPage() {
         </div>
       ) : (
         <Card className="p-10">
-          <EmptyState title="No savings plans yet" description="Create a flexible, locked, or goal-based savings pocket to get started." />
+          <EmptyState
+            title="No savings plans yet"
+            description="Create a flexible, locked, or goal-based savings pocket to get started."
+          />
         </Card>
       )}
 
       {/* Create plan dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogTitle className="text-lg font-semibold text-gray-900">New savings plan</DialogTitle>
-          <DialogDescription className="mt-0.5 text-sm text-gray-500">Choose a plan type and configure your savings goal.</DialogDescription>
+          <DialogTitle
+            className="text-lg font-semibold text-slate-900"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            New savings plan
+          </DialogTitle>
+          <DialogDescription className="mt-0.5 text-sm text-slate-500">
+            Choose a plan type and configure your savings goal.
+          </DialogDescription>
 
-          <form className="mt-4 space-y-4" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+          <form
+            className="mt-4 space-y-4"
+            onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+          >
             {/* Plan type selector */}
             <div>
               <div className="grid grid-cols-3 gap-2">
@@ -306,20 +335,28 @@ export default function SavingsPage() {
                         setSelectedType(type);
                         form.setValue('type', type);
                       }}
-                      className={`relative overflow-hidden rounded-xl border p-3 text-left transition-all duration-150 ${
-                        active ? 'border-transparent ring-2 ring-primary-400' : 'border-gray-200 hover:border-gray-300'
+                      className={`relative overflow-hidden rounded-xl border p-3 text-left transition-all duration-[140ms] active:scale-[0.97] ${
+                        active
+                          ? 'border-transparent ring-2 ring-blue-500'
+                          : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
-                      {active && <div className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-10`} />}
+                      {active && (
+                        <div
+                          className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-8`}
+                        />
+                      )}
                       <div className={`relative grid h-7 w-7 place-items-center rounded-lg ${config.iconBg}`}>
                         <Icon className="h-3.5 w-3.5" />
                       </div>
-                      <p className="relative mt-2 text-xs font-bold text-gray-900">{config.label}</p>
+                      <p className="relative mt-2 text-xs font-bold text-slate-900">
+                        {config.label}
+                      </p>
                     </button>
                   );
                 })}
               </div>
-              <p className="mt-1.5 text-xs text-gray-400">{planTypeConfig[selectedType].description}</p>
+              <p className="mt-1.5 text-xs text-slate-400">{planTypeConfig[selectedType].description}</p>
             </div>
 
             <FormField label="Plan name" error={form.formState.errors.name?.message}>
@@ -331,10 +368,20 @@ export default function SavingsPage() {
             </FormField>
 
             {selectedType === 'TARGET' && (
-              <FormField label="Target amount (NGN)" error={form.formState.errors.targetAmount?.message}>
+              <FormField
+                label="Target amount (NGN)"
+                error={form.formState.errors.targetAmount?.message}
+              >
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₦</span>
-                  <Input className="pl-7" inputMode="decimal" placeholder="750000" {...form.register('targetAmount')} />
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">
+                    &#x20A6;
+                  </span>
+                  <Input
+                    className="pl-7"
+                    inputMode="decimal"
+                    placeholder="750000"
+                    {...form.register('targetAmount')}
+                  />
                 </div>
               </FormField>
             )}

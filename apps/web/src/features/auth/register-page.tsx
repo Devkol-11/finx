@@ -37,7 +37,6 @@ export default function RegisterPage() {
   const mutation = useMutation({
     mutationFn: authApi.register,
     onSuccess: ({ data }) => {
-      ``;
       dispatch(
         setSession({
           token: data.accessToken,
@@ -51,8 +50,14 @@ export default function RegisterPage() {
 
   return (
     <Card className="p-6">
-      <h1 className="text-2xl font-semibold text-slate-950">Create your Finx account</h1>
+      <h1
+        className="text-2xl font-semibold text-slate-950"
+        style={{ letterSpacing: '-0.025em' }}
+      >
+        Create your Finx account
+      </h1>
       <p className="mt-1 text-sm text-slate-500">A wallet and FinxTag are created automatically.</p>
+
       <form
         className="mt-6 grid gap-4 sm:grid-cols-2"
         onSubmit={form.handleSubmit((values) =>
@@ -60,10 +65,10 @@ export default function RegisterPage() {
         )}
       >
         <FormField label="First name" error={form.formState.errors.firstName?.message}>
-          <Input {...form.register('firstName')} />
+          <Input autoComplete="given-name" {...form.register('firstName')} />
         </FormField>
         <FormField label="Last name" error={form.formState.errors.lastName?.message}>
-          <Input {...form.register('lastName')} />
+          <Input autoComplete="family-name" {...form.register('lastName')} />
         </FormField>
         <div className="sm:col-span-2">
           <FormField label="Email" error={form.formState.errors.email?.message}>
@@ -72,7 +77,7 @@ export default function RegisterPage() {
         </div>
         <div className="sm:col-span-2">
           <FormField label="Phone number" error={form.formState.errors.phoneNumber?.message}>
-            <Input placeholder="+234..." {...form.register('phoneNumber')} />
+            <Input autoComplete="tel" placeholder="+234..." {...form.register('phoneNumber')} />
           </FormField>
         </div>
         <div className="sm:col-span-2">
@@ -80,19 +85,22 @@ export default function RegisterPage() {
             <Input type="password" autoComplete="new-password" {...form.register('password')} />
           </FormField>
         </div>
-        {mutation.isError ? (
-          <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700 sm:col-span-2">
+
+        {mutation.isError && (
+          <div className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700 sm:col-span-2">
             {apiMessage(mutation.error)}
-          </p>
-        ) : null}
+          </div>
+        )}
+
         <Button className="sm:col-span-2" disabled={mutation.isPending}>
           {mutation.isPending ? 'Creating account...' : 'Create account'}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </form>
+
       <p className="mt-5 text-sm text-slate-500">
         Already have an account?{' '}
-        <Link className="font-semibold text-blue-700" to="/auth/login">
+        <Link className="font-semibold text-blue-600 hover:text-blue-700" to="/auth/login">
           Sign in
         </Link>
       </p>

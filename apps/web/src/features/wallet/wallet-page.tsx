@@ -8,11 +8,24 @@ import { PageHeader } from '@/components/common/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { walletApi } from '@/features/wallet/api';
 
-const actionButtonClass =
-  'group flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 py-3.5 shadow-sm transition-colors duration-200 hover:border-primary-300 hover:bg-primary-50 active:bg-primary-100';
+const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 
-const actionIconClass =
-  'flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-gray-500 transition-colors duration-200 group-hover:bg-primary-100 group-hover:text-primary-600';
+const actions = [
+  {
+    to: '/app/wallet/deposit',
+    icon: ArrowDownToLine,
+    label: 'Deposit',
+    sublabel: 'Add funds',
+    iconBg: 'bg-emerald-50 text-emerald-600',
+  },
+  {
+    to: '/app/transfers',
+    icon: Send,
+    label: 'Transfer',
+    sublabel: 'Send via FinxTag',
+    iconBg: 'bg-blue-50 text-blue-600',
+  },
+];
 
 export default function WalletPage() {
   const balance = useQuery({ queryKey: ['wallet', 'balance'], queryFn: walletApi.balance });
@@ -23,69 +36,60 @@ export default function WalletPage() {
     <div className="space-y-6">
       <PageHeader title="Wallet" description="Fund, withdraw, and monitor your Finx wallet." />
 
-      {/* ── Large screen layout ── */}
+      {/* Large screen: balance + actions side by side */}
       <div className="hidden lg:flex lg:items-stretch lg:gap-4">
         <div className="flex-1">
           <BalanceCard wallet={balance.data?.wallet} />
         </div>
         <div className="flex flex-col justify-center gap-3">
-          <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.15 }}>
-            <Link to="/app/wallet/deposit" className={actionButtonClass}>
-              <div className={actionIconClass}>
-                <ArrowDownToLine className="h-4 w-4" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-semibold text-gray-900">Deposit</p>
-                <p className="text-xs text-gray-400">Add funds</p>
-              </div>
-            </Link>
-          </motion.div>
-          <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.15 }}>
-            <Link to="/app/transfers" className={actionButtonClass}>
-              <div className={actionIconClass}>
-                <Send className="h-4 w-4" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-semibold text-gray-900">Transfer</p>
-                <p className="text-xs text-gray-400">Send via FinxTag</p>
-              </div>
-            </Link>
-          </motion.div>
+          {actions.map(({ to, icon: Icon, label, sublabel, iconBg }) => (
+            <motion.div
+              key={to}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.15, ease: EASE_OUT }}
+            >
+              <Link
+                to={to}
+                className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 shadow-[0_1px_3px_rgba(15,23,42,0.06)] transition-all duration-[140ms] hover:border-blue-200 hover:shadow-[0_4px_16px_rgba(37,99,235,0.10)]"
+              >
+                <div className={`grid h-9 w-9 place-items-center rounded-xl ${iconBg}`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-slate-900">{label}</p>
+                  <p className="text-xs text-slate-400">{sublabel}</p>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
         </div>
       </div>
 
-      {/* ── Small screen layout ── */}
+      {/* Small screen: stacked */}
       <div className="space-y-3 lg:hidden">
         <BalanceCard wallet={balance.data?.wallet} />
         <div className="grid grid-cols-2 gap-3">
-          <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.15 }}>
-            <Link
-              to="/app/wallet/deposit"
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-colors duration-200 hover:border-primary-300 hover:bg-primary-50 active:bg-primary-100"
+          {actions.map(({ to, icon: Icon, label, sublabel, iconBg }) => (
+            <motion.div
+              key={to}
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.14, ease: EASE_OUT }}
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500 transition-colors group-hover:bg-primary-100 group-hover:text-primary-600">
-                <ArrowDownToLine className="h-4 w-4" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-semibold text-gray-900">Deposit</p>
-                <p className="text-xs text-gray-400">Add funds</p>
-              </div>
-            </Link>
-          </motion.div>
-          <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.97 }} transition={{ duration: 0.15 }}>
-            <Link
-              to="/app/transfers"
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm transition-colors duration-200 hover:border-primary-300 hover:bg-primary-50 active:bg-primary-100"
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 text-gray-500">
-                <Send className="h-4 w-4" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-semibold text-gray-900">Transfer</p>
-                <p className="text-xs text-gray-400">Send via FinxTag</p>
-              </div>
-            </Link>
-          </motion.div>
+              <Link
+                to={to}
+                className="flex w-full items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all duration-[140ms] hover:border-blue-200 hover:bg-blue-50/60"
+              >
+                <div className={`grid h-8 w-8 place-items-center rounded-xl ${iconBg}`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-slate-900">{label}</p>
+                  <p className="text-xs text-slate-400">{sublabel}</p>
+                </div>
+              </Link>
+            </motion.div>
+          ))}
         </div>
       </div>
 
@@ -95,9 +99,14 @@ export default function WalletPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {balance.data?.recentActivity.length ? (
-            balance.data.recentActivity.map((item) => <TransactionCard key={item.id} transaction={item} />)
+            balance.data.recentActivity.map((item) => (
+              <TransactionCard key={item.id} transaction={item} />
+            ))
           ) : (
-            <EmptyState title="No wallet activity" description="Fund your wallet to begin moving money." />
+            <EmptyState
+              title="No wallet activity"
+              description="Fund your wallet to begin moving money."
+            />
           )}
         </CardContent>
       </Card>
